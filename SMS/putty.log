@@ -1,0 +1,213 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2020.03.07 08:35:07 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+SIN HACER NADA, la SIM emite
+
+RDY
++CFUN: 1
++CREG: 0
++CPIN: READY
++CREG: 2
+Call Ready
+SMS Ready
++CREG: 1
++CTZV: +4
+*PSUTTZ: 2021,1,2,19,33,33,"+4",0
+DST: 0
++CIEV: 10,"21403","Orange","Orange", 0, 0
+
+
+** Una forma de ver la hora, tarda tiempo en responder 
+at+sapbr=1,1
+OK
+at+cipgsmloc=1,1
++CIPGSMLOC: 0,0.000000,0.000000,2020/03/07,07:37:44
+OK
+at+sapbr=0,1
+
+** La forma mejor (cuando estï¿½ registrado)
+at+cclk?
+
++CCLK: "20/03/07,08:38:20+04"
+OK
+
+** Para ver correos pendientes
+at+cmgl="ALL"
+OK
+
+** Forzar que me diga SMS cuando llegue
+at+cnmi=1,2,0,0,0
+OK
+
+** Formato de SMS como texto
+at+cmgf?
+
++CMGF: 1
+OK
+
+** Cuando llega un mensaje:
+
++CMT: "+34619262851","","20/03/07,08:40:04+04"
+Es una prueba
+
+** Senyal
+at+csq
+
++CSQ: 17,0
+OK
+
+** Numero SIM
+at+ccid
+8934570541900628780f
+OK
+
+** Esta registrado?
+at+creg?
+
++CREG: 1,1
+OK
+
+** modelo
+ati
+
+SIM800 R14.18
+OK
+
+** proveedor
+at+cops?
+
++COPS: 0,0,"vodafone"
+OK
+
+** esta metido el PIN?
+at+cpin?
+
++CPIN: READY
+OK
+========================================================
+Ahora lo que hace es, sin mandarle ningún mensaje:
+
+
+RDY
+
++CFUN: 1
+
++CREG: 0
+
++CPIN: READY
+
++CREG: 2
+
+Call Ready
+
+SMS Ready
+
++CREG: 1
+
++CTZV: +4
+
+*PSUTTZ: 2021,1,2,18,5,49,"+4",0
+
+DST: 0
+
++CIEV: 10,"21403","Orange","Orange", 0, 0
+
+
+=======================
+Enviar y recibir
+at+cmgs="619262851"
++CMTI: "SM",1
+
+> Este es un mensaje de prueba!
+>
++CMGS: 6
+
+OK
+
+
+at+cpms?
++CPMS: "SM_P",0,50,"SM_P",0,50,"SM_P",0,50
+
+OK
+at+cpms="ME","ME","ME"
++CPMS: 0,50,0,50,0,50
+
+OK
+at+cpms?
++CPMS: "ME",0,50,"ME",0,50,"ME",0,50
+
+OK
+
++CMTI: "ME",51
+at+cmgl="ALL"
++CMGL: 51,"REC UNREAD","+34619262851","","21/01/02,20:28:03+04"
+Otro mensaje ya
+
+OK
+at+cmgl="ALL"
++CMGL: 51,"REC READ","+34619262851","","21/01/02,20:28:03+04"
+Otro mensaje ya
+
+OK
+at+cmgd=51
+OK
+at+cmgl="ALL"
+OK
+at+cpms?
++CPMS: "ME",0,50,"ME",0,50,"ME",0,50
+
+OK
+at+cnmi?
++CNMI: 2,1,0,0,0
+
+OK
+
+==============================
+Lectura
+at+cnmi=2,1,0,0,0
+OK
+                                => envio un mensaje, debia haber otro esperando (raro, había más por medio)
++CMTI: "SM",1
+
++CMTI: "SM",2
+at+cmgl="ALL"
++CMGL: 1,"REC UNREAD","+34619262851","","21/01/02,19:43:14+04"
+Vamos a ver hoy
+
++CMGL: 2,"REC UNREAD","+34619262851","","21/01/02,20:37:26+04"
+Vamos a ver
+
+OK
+at+cnmi?
++CNMI: 2,1,0,0,0
+
+OK
+at+cmgd=1
+OK
+at+cmgd=2
+OK
+at+cmgl="ALL"
+OK
+at+cnmi=1,2,0,0,0               => cambio a no memorizar
+OK
+
++CMT: "+34619262851","","21/01/02,20:40:22+04"
+Esta vez con CNMC=1,2
+at                              => raro, no hay ok ni otro salto de linea para señalar final
+OK
+at+cmgl="ALL"
+OK
+
++CMT: "+34619262851","","21/01/02,20:42:34+04"
+Otro mensaje
+
++CMT: "+34619262851","","21/01/02,20:42:49+04"
+Y otro con
+          Salto de linea
+
+
+
+
+
+
