@@ -3,6 +3,10 @@
 # NOTE: Can be overridden externally.
 #
 
+
+$(shell echo "#include \"version.h\"\n\nchar const *const GIT_COMMIT = \"$$(git describe --always --dirty --match 'NOT A TAG')\";\nchar const *const GIT_TAG = \"$$(git tag)\";" > version.cpp.tmp; if diff -q version.cpp.tmp version.cpp >/dev/null 2>&1; then rm version.cpp.tmp; else mv version.cpp.tmp version.cpp; fi)
+
+
 # Compiler options here.
 ifeq ($(USE_OPT),)
   USE_OPT = -O0 -ggdb -fomit-frame-pointer -falign-functions=16 -lm
@@ -83,7 +87,7 @@ endif
 #
 
 # Define project name here
-PROJECT = jaula
+PROJECT = miniPozo
 
 # Target settings.
 MCU  = cortex-m4
@@ -125,7 +129,7 @@ LDSCRIPT= $(STARTUPLD)/STM32F411xE.ld
 # setting.
 CSRC = $(ALLCSRC) \
        $(CHIBIOS)/os/various/evtimer.c \
-       main.c ssd1306/ssd1306.c
+       main.c 
        #  MPU6050/i2cdev_chibi.c 
        # $(CHIBIOS)MPU6050/i2cdev_chibi.c $(CHIBIOS)MPU6050/mpu6050.c \
        #       $(CHIBIOS)/os/various/syscalls.c \
@@ -134,11 +138,14 @@ CSRC = $(ALLCSRC) \
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CPPSRC = $(ALLCPPSRC) \
-         ADC/adcUtils.cpp \
-         w25q16/w25q16.cpp w25q16/varsGestion.cpp w25q16/volcarFlash.cpp \
-         SMS/sms.cpp SMS/manejaAT.cpp SMS/sim800.cpp  SMS/procesaOrden.cpp SMS/threadSMS.cpp \
-         tty/gets.cpp calendar/calendar.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp colas/colas.cpp colas/colasMensajesLcd.cpp \
-         vl53/VL53L0X.cpp vl53/threadVL530X.cpp vl53/gy53.cpp servoPWM.cpp gestor.cpp 
+         w25q16/w25q16.cpp variables/varsGestion.cpp variables/volcarFlash.cpp variables/variables.cpp version.cpp \
+         calendar/calendar.cpp calendar/rtcV2.cpp \
+         serial.cpp tty/gets.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp \
+         rf95/rf95.cpp rf95/RH_RF95.cpp \
+         radio/pozoComun.cpp radio/tratamientoMsgRF95.cpp radio/llamador.cpp  radio/radio.cpp\
+         colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp
+         
+
 #         usbSource/serialUSB.cpp w25q16/varsFlash.cpp
 
 # List ASM source files here.
@@ -171,7 +178,7 @@ UDEFS = -DCHPRINTF_USE_FLOAT=TRUE
 UADEFS =
 
 # List all user directories here
-UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg ADC w25q16 SMS tty calendar lcd colas vl53 MPU6050 ssd1306
+UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo
 
 # List the user directory to look for the libraries here
 ULIBDIR =

@@ -17,7 +17,7 @@
 #define RELEASE_POWER_DOWN 0xAB
 #define MANUFACTURER_ID 0x90
 
-void W25Q16_init(void);
+uint16_t W25Q16_start(void);
 void W25Q16_write(uint16_t page, uint8_t pageAddress, uint8_t val);
 void W25Q16_write_u16(uint16_t page, uint8_t pageAddress, uint16_t val);
 uint8_t W25Q16_read(uint16_t page, uint8_t pageAddress);
@@ -33,6 +33,7 @@ void W25Q16_releasePowerDown(void);
 void W25Q16_chipErase(void);
 void W25Q16_sectorErase(uint16_t page);
 uint16_t W25Q16_manufacturerID(void);
+void sleepW25q16(void);
 
 
 void W25Q16_writeEnable(void);
@@ -42,13 +43,5 @@ void W25Q16_notBusy(void);
 
 #define w25q16_PAGESIZE 0xFF
 #define w25q16_NUMPAGES 0x2000
-
-//int16_t leeVariableU8(uint16_t posParam, const char *nombParam, uint8_t valorMin, uint8_t valorMax, uint8_t *valor);
-//int16_t escribeVarU8(uint16_t posParam, const char *nombVar, uint8_t valor);
-//int16_t leeVariable8(uint16_t posParam, const char *nombParam, int8_t valorMin, int8_t valorMax, int8_t *valor);
-//int16_t escribeVar8(uint16_t posParam, const char *nombVar, int8_t valor);
-//int16_t leeVariableU16(uint16_t posParam, const char *nombParam, uint16_t valorMin, uint16_t valorMax, uint16_t *valor);
-//int16_t escribeVarU16(uint16_t posParam, const char *nombVar, uint16_t valor);
-
 
 #endif /* W25Q16_h */

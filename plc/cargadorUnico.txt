@@ -1,0 +1,29 @@
+#
+NEXTION 115200 logPLC.ajustes tmpVar.base blank 300
+#
+FECHA base year mes dia hora min
+#
+# nombre, medP, medI, setPointP, maxFases, iMax
+#
+MEDIDA SP.base.txt"SP 1:" 20 0
+MEDIDA Pve.base.txt"Pve1:" 20 0
+MEDIDA Ive.base.txt"Ive:" 20 1
+MEDIDA Ptot.base.txt"W casa:" 20 0
+MEDIDA kWhVE1.base.txt 20 2
+MEDIDA kWhParc.base.txt 20 2
+#
+COCHESIM SP 3 16 Pve kWhVE1 Ive
+CASASIM Ptot Pve
+# 
+CARGADOR car.base.picc.0 sensRCar SP 16 Pve kWhVE1 kWhParc 3 Ive Ive Ive 
+MAESTRO car [ajustFijoAuto.ajustes.picc.4 0] [Ifija.ajustes 10] Ptot Pmax.base.txt [Ppunta.ajustes.txt 10000] [Pvalle.ajustes.txt 15000]
+#
+CANBUS 1
+MED2CAN SP 11
+MED2CAN Pve 12
+MED2CAN Ive 13
+MED2CAN Ptot 14
+MED2CAN kWhVE1 15
+STATE2CAN sensRCar 16
+#
+WWW

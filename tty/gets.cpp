@@ -290,7 +290,7 @@ void int2str(uint8_t valor, char *string)
     string[8] = 0;
 }
 
-int16_t preguntaNumero(BaseChannel *ttyBC, char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax)
+int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax)
 {
     uint8_t buffer[50];
     int16_t error;

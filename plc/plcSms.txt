@@ -1,0 +1,11 @@
+#
+NEXTION 115200 logPlc.PLC tmpVar.base
+#
+FECHA base year mes dia hora min
+#
+SINO enCasa.base.picc.15 0
+NOT noEnCasa enCasa
+GRUPO varios enCasa smsReady
+#
+SMS [tlfAdmin.sms 619262851] [pin.sms 3421] logSms.sms.txt rssi.sms.txt proveedor.sms.txt smsReady.sms.pic.31 cReg.sms.txt
+#

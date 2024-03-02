@@ -27,7 +27,8 @@ using namespace chibios_rt;
   uint8_t _displaycontrol;
   uint8_t _displaymode;
   uint8_t _backlightval;
-
+  uint8_t lcd_addr = 0x27;
+  uint8_t hayLcd = 0;
   uint8_t imagenLcd[LCD_ROWS][LCD_COLS];
   uint8_t lcdCol, lcdRow;
 
@@ -194,14 +195,38 @@ void lcd_begin(uint8_t dotsize, uint8_t _displayfunction) {
 	//osalThreadSleepMilliseconds(5);
 }
 
-
 void lcd_I2Cinit(void)
 {
   uint8_t displayfunction;
+  uint8_t tx_data[1], rx_data[1];
+  msg_t status;
+  // detectamos dirección de LCD 0x27 o 0x3F
+  tx_data[0] = 0;
+  lcd_addr = 0x27;
+  hayLcd = 1;
+  i2cAcquireBus(&I2CD2);
+  status = i2cMasterTransmitTimeout(&I2CD2, lcd_addr, tx_data, 1 , rx_data, 0, TIME_MS2I(100));
+  if (status!=MSG_OK)
+  {
+      lcd_addr = 0x3F;
+      status = i2cMasterTransmitTimeout(&I2CD2, lcd_addr, tx_data, 1 , rx_data, 0, TIME_MS2I(100));
+      if (status!=MSG_OK)
+          hayLcd = 0;
+  }
+  i2cReleaseBus(&I2CD2);
+  // ahora a por la inicializacion
   _backlightval = LCD_NOBACKLIGHT;
   displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
   lcd_begin(LCD_5x8DOTS, displayfunction);
 }
+
+//void lcd_I2Cinit(void)
+//{
+//  uint8_t displayfunction;
+//  _backlightval = LCD_NOBACKLIGHT;
+//  displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
+//  lcd_begin(LCD_5x8DOTS, displayfunction);
+//}
 
 /********** high level lcd_commands, for the user! */
 void lcd_clear(void){
@@ -500,6 +525,8 @@ int chLcdprintfFilaC(uint8_t fila, const char *fmt, ...)
     uint8_t buffer[25];
     int retval,i;
 
+    if (!hayLcd)
+        return 0;
     if (sizeof(buffer) > 0)
       size_wo_nul = sizeof(buffer) - 1;
     else

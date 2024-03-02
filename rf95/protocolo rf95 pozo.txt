@@ -1,0 +1,86 @@
+- Hay unas estructuras de datos para guardar un cierto número de errores de Pozo, tanto en la unidad del Pozo como en los satélites. 
+- Hay 5 slots para errores/avisos cuya clave de acceso es idEstacion+numError. Estos errores se pueden limpiar en cualquier momento en el Pozo, o activarlos. Además del idEstacion+numError usados como clave, también almacena un texto breve (20 caracteres) con un texto complementario en cada slot de error
+- Hay unas rutinas en background en el Pozo que van recorriendo los slots de errores y envían pulsos al ledInterno. Para cada slot manda pulsos largos primero (con el NumError) y luego pulsos cortos (con el idEstacion). Cuando termina de señalizar un slot de error, busca el siguiente disponible, de este modo recorre todos los errores que hay almacenados en la estructura de errores
+- Nuevos mensajes que envía el Pozo: MSG_ERROR y MSG_CLEARERROR, para enviar cada 15 segundos condiciones de error a los satélites. Incluyen numError, IdEstacion y texto con detalles del error (actualmente el texto es "HH:MM", o "DD HH:MM" si supera un día, que lleva encendida la llamacion). Si el llamador resetea la llamación se libera el slot de error y se envía MSG_CLEARERROR a los satélites.
+
+
+USO
+
+- Si se superan las 6 horas, el Pozo activa un slot de error con el numError=1 (llamación bloqueada) e IdEstacion la que tiene el problema.
+-Cada 15 segundos, se recorren los slots de errores/avisos y se manda para cada uno de ellos un mensaje de MSG_ERROR a todos
+-El llamador tiene la misma estructura de errores que tiene el Pozo. Está replicada. Cada MSG_ERROR o MSG_CLEARERROR actualiza los slots de errores. Y el método de aviso de leds es idéntico, por lo que los satélites replican los errores que también muestra el Pozo
+-Los slots de error caducan a los 30 segundos. Si nadie los actualiza la rutina de visualización se encarga de resetearlos. Es decir, si el Pozo no mantiene vivo el error, a los 30 segundos se resetea.
+
+
+
+// Formato de mensajes:
+
+#define MSG_STATUSPOZO              1
+#define MSG_STATUSLLAMACIONLOCAL    2
+#define MSG_ERROR                   3
+#define MSG_CLEARERROR              4
+//
+// *****************************************************************
+// Tipo de Mensaje MSG_STATUSPOZO. Longitud=5 bytes
+// Este mensaje es un beacon que se envía desde el Pozo a todos los satélites cada vez que cambia 
+// la situación de un llamador, o bien si ha pasado más de 5 segundos sin mandar una situación
+//
+// Formato del mensaje:
+//    Byte 0: MSG_STATUSPOZO
+//    Byte 1: Id del originador: 0=Pozo, 1 a 8 satélites llamadores
+//    Byte 2: Estado bomba del Pozo '0' '1'
+//    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el satélite ha de transmitir como mucho cada 15 segundos
+//    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una señal de llamación de un satélite. Se distribuye a todo el mundo, para que todos puedan saber la situación
+//
+// *****************************************************************
+//
+// *****************************************************************
+// Tipo de Mensaje MSG_STATUSLLAMACIONLOCAL. Longitud=3 bytes
+// Este mensaje es un beacon que se envía desde el satélite, para indicar la situación de su llamación
+//
+// Formato del mensaje:
+//    Byte 0: MSG_STATUSLLAMACIONLOCAL
+//    Byte 1: Id del originador: 0=Pozo, 1 a 8 satélites llamadores
+//    Byte 2: Estado llamacion local '0' '1'
+//
+// *****************************************************************
+//
+// *****************************************************************
+// Tipo de Mensaje MSG_ERROR. Longitud=variable, de 4 a un máximo de 24 bytes
+// Este mensaje es un beacon que se envía desde el satélite, indicando errores
+//
+// Formato del mensaje:
+//    Byte 0: MSG_ERROR
+//    Byte 1: Id del originador: 0=Pozo, 1 a 8 satélites llamadores
+//    Byte 2: Número de error
+//    Byte 3: Id estación con problemas. 0=Pozo, 1 a 8 satélites llamadores
+//    Byte 4: Número de bytes del texto. Max 20. 
+//    Texto variable: de 1 a 21 bytes de texto (incluyendo el terminador 0)
+//
+// *****************************************************************
+//
+// *****************************************************************
+// Tipo de Mensaje MSG_CLEARERROR. Longitud=4 
+// Este mensaje lo envía el Pozo si ha desaparecido un error de una estación
+//
+// Formato del mensaje:
+//    Byte 0: MSG_ERROR
+//    Byte 1: Id del originador: 0=Pozo, 1 a 8 satélites llamadores
+//    Byte 2: Número de error
+//    Byte 3: Id estación con problemas resueltos. 0=Pozo, 1 a 8 satélites llamadores
+//
+// *****************************************************************
+//
+
+
+#include <SPI.h>
+#include <RH_RF95.h>
+#include <avr/wdt.h> // Incluir la librería que contiene el watchdog (wdt.h)
+
+// Singleton instance of the radio driver
+RH_RF95 rf95;
+#define FREQUENCY  434
+
+#define NUMSATELITES    8 //(ID del 1 al 8)
+
+

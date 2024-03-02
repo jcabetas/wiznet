@@ -1,0 +1,23 @@
+# Kona: cargador esclavo conectado a un maestro (Tesla)
+#
+NEXTION 115200 logPLC.ajustes tmpVar.base blank 300
+#
+FECHA base year mes dia hora min
+#
+MEDIDA SP.base.txt 20 0
+MEDIDA Pve.base.txt 20 0
+MEDIDA Ive.base.txt 20 1
+MEDIDA kWhTot.base.txt 20 2
+MEDIDA kWhParc.base.txt 20 2
+#
+MEDIDA Ptot.base.txt 20 0
+#
+COCHESIM SP 1 32 Pve kWhTot Ive
+# 
+CARGADOR car.base.picc.0 ajustes [ID.ajustes 2] Ptot [Ppunta 10000] [Pvalle 15000] coches SP 32 Pve kWhTot kWhParc 1 Ive
+CARG-AJUSTES cuando [ajustFAM1.cuando.picc.5 1] [Ifija1 10]  [punta1 0] [llano1 1] [valle1 1] [hora11 0] [hora12 6] [solosol1 0]
+CARG-AJUSTES cuando [ajustFAM2.cuando.picc.5 1] [Ifija2 10]  [punta2 0] [llano2 1] [valle2 1] [hora21 0] [hora22 6] [solosol2 0]
+
+#
+CANBUS 2
+CAN2MED 14 Ptot

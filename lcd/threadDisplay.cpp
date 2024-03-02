@@ -14,9 +14,8 @@ extern "C" {
 #include "string.h"
 #include "chprintf.h"
 #include "lcd.h"
-#include "ssd1306.h"
 #include "colas.h"
-#include "jaula.h"
+#include "../miniPozo.h"
 
 thread_t *procesoLCD = NULL;
 event_source_t updateLCD_source;

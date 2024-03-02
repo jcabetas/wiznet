@@ -1,0 +1,44 @@
+#
+NEXTION 115200 logPLC.ajustes tmpVar.base blank 300
+#
+FECHA base year mes dia hora min
+#
+# nombre, medP, medI, setPointP, maxFases, iMax
+#
+MEDIDA SP.base.txt 20 0
+MEDIDA SP2.base.txt"Setpoint 2" 20 0
+MEDIDA Pve.base.txt 20 0
+MEDIDA Pve2.base.txt 20 0
+MEDIDA Ive.base.txt 20 1
+MEDIDA Ive2.base.txt 20 1
+MEDIDA Ptot.base.txt"Pot casa (W): " 20 0
+MEDIDA kWhTot.base.txt 20 2
+MEDIDA kWhTot2.base.txt 20 2
+MEDIDA kWhParc.base.txt 20 2
+MEDIDA kWhParc2.base.txt 20 2
+#
+COCHESIM Ptot Pve kWhTot Pve2 kWhTot2 Ive Ive2 SP SP2 sensRCar2
+#SENSORCARGADOR sensRCar
+# 
+CARGADOR car.base.picc.0 sensRCar SP 16 Pve kWhTot kWhParc 3 Ive Ive Ive 
+CARGADOR car2.base.picc.0 sensRCar2 SP2 32 Pve2 kWhTot2 kWhParc2 1 Ive2
+MAESTRO car [ajustFijoAuto.ajustes.picc.4 0] [Ifija.ajustes 10] Ptot Pmax.base.txt [Ppunta.ajustes.txt 10000] [Pvalle.ajustes.txt 15000]
+#
+CANBUS 1
+MED2CAN SP 11
+MED2CAN Pve 12
+MED2CAN Ive 13
+MED2CAN Ptot 14
+MED2CAN kWhTot 15
+STATE2CAN sensRCar 20
+#
+WWW
+SINO enCasa.base.picc.0"En Casa" 0
+SINOAUTO enCasa calderaVal.base.picc.0"Caldera val" caldera.base.picc.0"Caldera" 0
+#
+# Riego
+PROGRAMADOR riego.riego.pic.23"Riego" riegoOnOff bombaOnR.riego.pic.0"Bomba" pararRiego"Espero llenado" logR.riego.txt
+ZONA riego Chopos zona0nam.riego.txt zona0pic.riego.pic.0 [z0Min.riego 5] [z0MinB.riego 0]
+ZONA riego Arizonicas zona1nam.riego.txt zona1pic.riego.pic.0 [z1Min.riego 3] [z1MinB.riego 10]
+ZONA riego Cesped zona2nam.riego.txt zona2pic.riego.pic.0 [z2Min.riego 3] [z2MinB.riego 10]
+START riego manyanas [h0.riego 8] [m0.riego 0] [dow0.riego LMXJVSD] [esp0.riego 0]

@@ -20,6 +20,28 @@ struct queu_t {
     mutex_t *mtxQUEU;
 };
 
+struct cambiosPozo_t {
+  time_t timet;
+  uint8_t estLlam;
+  uint8_t estActi;
+  uint8_t estAbuso;
+  uint8_t estErr;
+  float m3Total;
+  float kWhPunta;
+  float kWhValle;
+};
+
+struct msgRx_t {
+  time_t timet;
+  uint8_t numBytes;
+  int16_t rssi;
+  uint8_t msg[30];
+};
+
+struct msgTx_t {
+  uint8_t numBytes;
+  uint8_t msg[30];
+};
 
 struct msgLcd_t {
     uint8_t fila;

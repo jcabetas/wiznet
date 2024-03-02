@@ -1,0 +1,26 @@
+# Cargador del Kona
+#
+NEXTION 115200 logPLC.plc tmpVar.base blank 300
+#
+FECHA base year mes dia hora min
+#
+MODBUS 2400
+SDM120CT MEDKONA 1
+MEDIDA SP.base.txt 20 0
+MEDIDA Pve.base.txt 5 0 MEDKONA P
+MEDIDA Ive.base.txt 40 1 MEDKONA I
+MEDIDA kWhTot.base.txt 100 2 MEDKONA kWh
+MEDIDA kWhParc.base.txt 100 2
+#
+MEDIDA Ptot.base.txt 5 0
+# 
+CARGADOR car.base.picc.0 coches [ID.coches 1] Ptot [Ppunta 10000] [Pvalle 15000] coches SP 32 [mAmin 4300] Pve kWhTot kWhParc 1 Ive
+CARG-AJUSTES cuando [ajustFAM1.cuando.picc.5 1] [Ifija1 10]  [punta1 0] [llano1 1] [valle1 1] [hora11 0] [hora12 6] [solosol1 0]
+CARG-AJUSTES cuando [ajustFAM2.cuando.picc.5 1] [Ifija2 10]  [punta2 0] [llano2 1] [valle2 1] [hora21 0] [hora22 6] [solosol2 0]
+#
+CANBUS 2
+CAN2MED 14 Ptot
+MED2CAN Pve 21
+MED2CAN Ive 22
+MED2CAN kWhParc 23
+MED2CAN kWhTot 24

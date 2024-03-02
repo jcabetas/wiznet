@@ -1,0 +1,22 @@
+#
+NEXTION 115200 logPLC.ajustes tmpVar.base blank 300
+#
+FECHA base year mes dia hora min
+#
+# nombre, medP, medI, setPointP, maxFases, iMax
+#
+MEDIDA SP.base.txt 20 0
+MEDIDA SP2.base.txt 20 0
+MEDIDA Pve.base.txt 20 0
+MEDIDA Pve2.base.txt 20 0
+MEDIDA Ive.base.txt 20 1
+MEDIDA Ive2.base.txt 20 1
+MEDIDA Ptot.base.txt 20 0
+#
+COCHESIM Ptot Pve Pve2 Ive Ive2 SP SP2
+#
+CARGADOR car.base.picc.0 SP 16 Pve 3 Ive Ive Ive 
+CARGADOR car2.base.picc.0  SP2 32 Pve2 1 Ive2
+MAESTRO car [ajustFijoAuto.ajustes 0] [IFija 10] Ptot [Pmax.base.txt 10000]
+#
+#ESCLAVO konaChg [ajustFijoAuto 0] [IFija.ajustes 10] pCasa
