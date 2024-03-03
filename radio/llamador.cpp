@@ -19,7 +19,7 @@ using namespace chibios_rt;
 //#include "../radio/pozo.h"
 //#include "tipoVars.h"
 #include "radio.h"
-#include "calendar.h"
+#include "calendarUTC.h"
 
 #include <stdlib.h>
 
@@ -27,13 +27,14 @@ using namespace chibios_rt;
 //time_t GetTimeUnixSec(void);
 int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
-
 extern struct queu_t colaMsgTx;
 extern event_source_t newMsgTx_source;
 extern struct queu_t colaMsgRx;
 
 extern struct msgRx_t ultMsg;
 
+event_source_t sensor_source;
+extern uint8_t estadoDeseado;
 extern uint16_t modoRadio;
 extern uint16_t sOlvido;
 extern uint16_t idLlamador;
@@ -42,6 +43,17 @@ extern uint16_t dsMinEntreMsgsLlamador;
 
 //extern event_source_t hayRxParaLCD_source;
 //extern event_source_t hayCambiosLCD_source;
+
+static const SPIConfig spicfgRF95 = {
+    .circular         = false,
+    .slave            = false,
+    .data_cb          = NULL,
+    .error_cb         = NULL,
+    .ssport           = GPIOB,
+    .sspad            = GPIOB_NSS,
+    .cr1              = SPI_CR1_BR_1 | SPI_CR1_BR_0,
+    .cr2              = 0U
+};
 
 thread_t *procesoLlamador;
 extern "C"
@@ -132,9 +144,13 @@ void llamador::enviaStatusLlamacion(void)
         msgTx.msg[2] = '0';
     //putQueu(&colaMsgTx, &msgTx);
     //chEvtBroadcast(&newMsgTx_source);
+    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_send(msgTx.msg,msgTx.numBytes);
+    spiStop(&SPID1);
     RHGenericDriver_waitPacketSent(100);
+    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_setModeRx();
+    spiStop(&SPID1);
     calendar::getFechaHora(&dateTimeEnvioAnterior);
 }
 
@@ -226,7 +242,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         {
             gestionaEstadoPozo(petBombaMsg, estadoLlamacionesMsg, estadoActivosMsg);
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
-            calendar::getFecha(&fechHora);
+            calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Msg pozo. Bomba:%d RSSI:%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, petBombaMsg, msgRx->rssi);
             uint8_t varNext = numEstMsg;
             if (varNext>6) varNext=6;
@@ -240,7 +256,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (numEstMsg>=1 && numEstMsg<=8 && (petBombaMsg==0 || petBombaMsg==1))
         {
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
-            calendar::getFecha(&fechHora);
+            calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Msg de #%d. Llamacion:%d RSSI:%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, numEstMsg,petBombaMsg, msgRx->rssi);
 //            enviaTxtSiEnPage(idPageLog,idNombreLog, buffer);
             uint8_t varNext = numEstMsg;
@@ -275,7 +291,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
         if (estadoAbusones != estadoAbusonesOld)
         {
-            calendar::getFecha(&fechHora);
+            calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Abusa #%d msg:'%s'",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec,estProblematica,bufError);
         }
     }
@@ -301,7 +317,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
         if (estadoAbusones != estadoAbusonesOld)
         {
-            calendar::getFecha(&fechHora);
+            calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Deja de abusar #%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, estProblematica);
             //enviaTxt(idPageLog,idNombreLog, buffer);
         }
@@ -328,9 +344,13 @@ void llamador::trataRxRf95(eventmask_t evt)
     {
         while (getQueu(&colaMsgTx, &msgTx))
         {
+            spiStart(&SPID1, &spicfgRF95);
             RH_RF95_send(msgTx.msg,msgTx.numBytes);
+            spiStop(&SPID1);
             RHGenericDriver_waitPacketSent(100);
+            spiStart(&SPID1, &spicfgRF95);
             RH_RF95_setModeRx();
+            spiStop(&SPID1);
         }
     }
 }
@@ -387,11 +407,20 @@ llamador *llamadorObj;
 static THD_WORKING_AREA(waThreadLlamador, 1024);
 static THD_FUNCTION(ThreadLlamador, arg) {
   (void)arg;
+
+  event_listener_t el0;
   chRegSetThreadName("llamador");
   llamadorObj = new llamador();
   llamadorObj->init();
-  while (true) {
-      chThdSleepMilliseconds(50);
+  chEvtRegister(&sensor_source, &el0, 0);
+  while(!chThdShouldTerminateX()) {
+    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
+    if (chThdShouldTerminateX())
+        chThdExit((msg_t) 1);
+    if (evt == 0)  // timeout
+        continue;
+    llamadorObj->update(estadoDeseado);
+    chThdSleepMilliseconds(50);
    }
 }
 

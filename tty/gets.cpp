@@ -295,10 +295,12 @@ int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr,
     uint8_t buffer[50];
     int16_t error;
     uint32_t resultado;
+    uint8_t huboTimeout;
     BaseSequentialStream *tty = (BaseSequentialStream *)ttyBC;
     chprintf((BaseSequentialStream *)tty,msg);
     chprintf((BaseSequentialStream *)tty," [%d...%d]:", valorMin, valorMax);
-    chgets(ttyBC, buffer,sizeof(buffer));
+    chgetsNoEchoTimeOut(ttyBC, buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
+//    chgets(ttyBC, buffer,sizeof(buffer));
     chprintf((BaseSequentialStream *)tty,"\n\r");
     if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
     {

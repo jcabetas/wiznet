@@ -21,9 +21,10 @@ using namespace chibios_rt;
 #include "variables.h"
 #include "version.h"
 #include "lcd.h"
+#include "calendarUTC.h"
 
 extern "C" {
-    void opciones(void);
+    void initHM10(void);
 }
 
 #define ttyHM10 &SD6
@@ -42,6 +43,7 @@ extern uint16_t dsMinEntreMsgsPozo;
 
 bool sdHM10open = false;
 extern uint8_t hayW25q16;
+thread_t *thrHM10 = NULL;
 
 
 static const SerialConfig ser_cfg9600 = {9600, 0, 0, 0, };//{115200, 0, 0, 0, };
@@ -77,7 +79,7 @@ struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs
    => AT+RESET\r\n
 
  */
-uint8_t hayAlguienConectado(char buffer[], uint8_t sizeBuffer)
+uint8_t testHM10(char buffer[], uint8_t sizeBuffer)
 {
     uint8_t huboTimeout;
     // devuelve 1 si hay alguien, 2 si no hay nadie y esta a 19200 y 3 idem a 9600
@@ -105,19 +107,14 @@ uint8_t hayAlguienConectado(char buffer[], uint8_t sizeBuffer)
 void initSerialHM10(void) {
     uint8_t huboTimeout;
     char buffer[20];
-    if (sdHM10open)
-        return;
     palClearLine(LINE_TX6);
     palSetLine(LINE_RX6);
     palSetLineMode(LINE_RX6, PAL_MODE_ALTERNATE(8));
     palSetLineMode(LINE_TX6, PAL_MODE_ALTERNATE(8));
-    uint8_t testHM10 = hayAlguienConectado(buffer,sizeof(buffer));
-    if (testHM10 == 1)
-    {
-        sdHM10open = true;
+    uint8_t estadoHM10 = testHM10(buffer,sizeof(buffer));
+    if (estadoHM10 == 1)  // debe haber alguien conectado, todo esta ok
         return;
-    }
-    if (testHM10 == 3) // paso el modulo a 19200
+    if (estadoHM10 == 3) // esta a 9600 => paso el modulo a 19200
     {
         chprintf((BaseSequentialStream*) ttyHM10,"AT+BAUD5\r\n"); // 4=>9600, 5=>19200
         chgetsNoEchoTimeOut((BaseChannel *) ttyHM10, (uint8_t *) buffer,sizeof(buffer), TIME_MS2I(100), &huboTimeout);
@@ -135,10 +132,38 @@ void initSerialHM10(void) {
         chThdSleepMilliseconds(2000);
         chLcdprintfFila(3,"");
     }
-    sdHM10open = true;
 }
 
 
+void ajustaHora(SerialDriver *sdCOM)
+{
+    uint32_t ano, mes, dia, hora, min, sec;
+    char buff[50];
+    struct tm tim;
+    int16_t result;
+
+    BaseSequentialStream *ttyCOM = (BaseSequentialStream *) sdCOM;
+    calendar::rtcGetFecha();
+    calendar::gettm(&tim);
+    ano = tim.tm_year+100;
+    mes = tim.tm_mon+1;
+    dia = tim.tm_mday;
+    hora = tim.tm_hour;
+    min = tim.tm_min;
+    sec = tim.tm_sec;
+    if (preguntaNumero((BaseChannel *) sdCOM, "Anyo", &ano, 2023, 2060) == 2)
+        return;
+    preguntaNumero((BaseChannel *) sdCOM, "Mes", &mes, 1, 12);
+    preguntaNumero((BaseChannel *) sdCOM, "Dia", &dia, 1, 31);
+    preguntaNumero((BaseChannel *) sdCOM, "Hora", &hora, 0, 23);
+    preguntaNumero((BaseChannel *) sdCOM, "Minutos", &min, 0, 59);
+    result = preguntaNumero((BaseChannel *) sdCOM, "Segundos", &sec, 0, 59);
+    if (result==2)
+        return;
+    calendar::cambiaFechaTM(ano-1900, mes-1, dia, hora, min, sec, 0);
+    calendar::printFecha(buff,sizeof(buff));
+    chprintf(ttyCOM,"Fecha actual UTC: %s\n",buff);
+}
 
 void ajustaValor(BaseChannel *sdCOM, struct opcion_t *opcion)
 {
@@ -260,20 +285,40 @@ uint8_t cambiaNombreModulo(SerialDriver *sdCOM)
 //struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs (ds)"};
 
 
-
-void opciones(void)
+void esperaConexionHM10(void)
 {
+    char buffer[10];
+    uint8_t huboTimeout;
+    while (true)
+    {
+        chprintf((BaseSequentialStream*) ttyHM10,"AT\r\n");
+        chgetsNoEchoTimeOut((BaseChannel *) ttyHM10, (uint8_t *) buffer, sizeof(buffer), TIME_MS2I(100), &huboTimeout);
+        if (huboTimeout)
+            return; // hay alguien, ya que no devuelve OK
+        chThdSleepMilliseconds(1000);
+    }
+}
+
+
+static THD_WORKING_AREA(waThreadHM10, 1024);
+static THD_FUNCTION(ThreadHM10, arg) {
+    (void)arg;
+    chRegSetThreadName("HM10");
     int16_t result;
     uint32_t opcion;
+    char buff[25];
     BaseSequentialStream *ttyOpciones;
     ttyOpciones = (BaseSequentialStream *)ttyHM10;
     initSerialHM10();
-    while (1==1)
+    while (true)
     {
+        esperaConexionHM10();
+        chprintf((BaseSequentialStream *)&SD1,"Se han conectado a HM10\n");
         leeVariables();
         chprintf(ttyOpciones,"\n");
         chprintf(ttyOpciones,"GIT Tag:%s Commit:%s\n",GIT_TAG,GIT_COMMIT);
-
+        calendar::printFecha(buff,sizeof(buff));
+        chprintf((BaseSequentialStream*)&SD6,"Fecha actual UTC: %s\n",buff);
         printOpcion(ttyOpciones, &opcMR);
         printOpcion(ttyOpciones, &opcSO);
         if (modoRadio==1)
@@ -292,18 +337,27 @@ void opciones(void)
         }
         chprintf(ttyOpciones,"\n");
         chprintf(ttyOpciones,"1 Ajusta variables\n");
-        chprintf(ttyOpciones,"2 Cambiar nombre modulo\n");
+        chprintf(ttyOpciones,"2 Ajusta fecha\n");
+        chprintf(ttyOpciones,"3 Cambiar nombre modulo\n");
 
         limpiaBuffer((BaseChannel *) ttyHM10); // por si esta conectado HM-10 y da mensajes de error
-        result = preguntaNumero((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 2);
+        result = preguntaNumero((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 3);
         chprintf(ttyOpciones,"\n");
         if (result==1)
             continue;
-        if (opcion==1)
+        if (result==0 && opcion==1)
             ajustaVariables(ttyHM10);
-        if (opcion==2)
+        if (result==0 && opcion==2)
+            ajustaHora(ttyHM10);
+        if (result==0 && opcion==3)
             cambiaNombreModulo(ttyHM10);
     }
+}
+
+void initHM10(void)
+{
+    if (thrHM10==NULL)
+        chThdCreateStatic(waThreadHM10, sizeof(waThreadHM10), NORMALPRIO, ThreadHM10, NULL);
 }
 
 

@@ -18,18 +18,22 @@
 #include "hal.h"
 #include "varsFlash.h"
 #include "lcd.h"
+#include "chprintf.h"
 
 extern event_source_t updateLCD_source;
+extern event_source_t sensor_source;
+uint8_t estadoDeseado;
 
 uint16_t initW25q16(void);
 void initDisplay(void);
 void initColas(void);
-void opciones(void);
+void initHM10(void);
 uint8_t esperaHM10(void);
 void initSerialHM10(void);
 void initRF95(void);
 void initSpiPins(void);
 void initLlamador(void);
+void initCalendar(void);
 
 void leeVariablesC(void);
 void ponEnLCDC(uint8_t fila, char const msg[]);
@@ -65,23 +69,57 @@ void initI2C(void)
     i2cStart(&LCD_I2C, &i2ccfg); // LCD
 }
 
-///*
-// * Gestor HM10 (no posible por error de placa)
-// */
-static THD_WORKING_AREA(waThreadHM10, 512);
-static THD_FUNCTION(ThreadHM10, arg) {
-  (void)arg;
-  chRegSetThreadName("HM10");
+void initSD1(void)
+{
+    palSetLineMode(LINE_RX1,PAL_MODE_ALTERNATE(7) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
+    palSetLineMode(LINE_TX1,PAL_MODE_ALTERNATE(7) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
+    SerialConfig configSD1;
+    configSD1.speed = 115200;
+    configSD1.cr1 = 0;
+    configSD1.cr2 = USART_CR2_STOP1_BITS;// | USART_CR2_LINEN;;
+    configSD1.cr3 = 0;
+    sdStart(&SD1, &configSD1);
+    chprintf((BaseSequentialStream *)&SD1,"Prueba de SD1\n");
+    chprintf((BaseSequentialStream *)&SD1,"Segunda linea\n");
+}
 
-  while (true) {
-      opciones();
-   }
+void cb_sensor(void *)
+{
+    estadoDeseado = !palReadLine(LINE_SENSOR);
+    if (estadoDeseado)
+        palClearLine(LINE_LED);         // enciende
+    else
+        palSetLine(LINE_LED);           // apagado
+    chSysLockFromISR();
+    chEvtBroadcastI(&sensor_source);
+    chSysUnlockFromISR();
+}
+
+void initSensor(void)
+{
+    estadoDeseado = !palReadLine(LINE_SENSOR);
+    if (estadoDeseado)
+        palClearLine(LINE_LED);         // enciende
+    else
+        palSetLine(LINE_LED);           // apagado
+    palSetLineMode(LINE_SENSOR, PAL_MODE_INPUT);
+    palEnableLineEvent(LINE_SENSOR, PAL_EVENT_MODE_BOTH_EDGES);     // Falling edge creates event
+    palSetLineCallback(LINE_SENSOR, cb_sensor, NULL); // Active callback
+}
+
+void testRele(void)
+{
+    palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
+    palClearLine(LINE_RELE);
+    chThdSleepMilliseconds(1000);
+    palSetLine(LINE_RELE);
+    chThdSleepMilliseconds(1000);
+    palClearLine(LINE_RELE);
 }
 
 /*
  * Application entry point.
  */
-event_source_t cambioEnVL53_source, cambioBotonSource;
 
 
 int main(void) {
@@ -89,27 +127,25 @@ int main(void) {
   chSysInit();
 
   chEvtObjectInit(&updateLCD_source);
-  chEvtObjectInit(&cambioBotonSource);
+  chEvtObjectInit(&sensor_source);
 
   initColas();
   initI2C();
   initSpiPins();
   initDisplay();
+  initSD1();
+  chprintf((BaseSequentialStream *)&SD1,"Arrancado LCD\n");
   chLcdprintfFilaC(3,"Arrancado LCD");
-  chThdSleepMilliseconds(500);
+  chThdSleepMilliseconds(100);
   leeVariablesC();
+  chprintf((BaseSequentialStream *)&SD1,"Leido variables\n");
   chLcdprintfFilaC(3,"Leido variables");
-  chThdSleepMilliseconds(500);
-  chThdCreateStatic(waThreadHM10, sizeof(waThreadHM10), NORMALPRIO, ThreadHM10, NULL);
-  //initRF95();
+  chThdSleepMilliseconds(100);
+ // testRele();
+  initHM10();
   initLlamador();
-  palSetLineMode(LINE_SENSOR, PAL_MODE_INPUT);
-  palSetLineMode(LINE_LED, PAL_MODE_OUTPUT_PUSHPULL);
+  initSensor();
   while (true) {
-      if (!palReadLine(LINE_SENSOR))
-          palClearLine(LINE_LED);         // enciende
-      else
-          palSetLine(LINE_LED);           // apagado
       chThdSleepMilliseconds(50);
   }
 }

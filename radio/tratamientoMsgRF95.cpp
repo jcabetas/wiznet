@@ -35,6 +35,17 @@ void initRF95(void);
 
 thread_t *procesoMsgRf95;
 extern thread_t *procesoRf95Int;
+static const SPIConfig spicfgRF95 = {
+    .circular         = false,
+    .slave            = false,
+    .data_cb          = NULL,
+    .error_cb         = NULL,
+    .ssport           = GPIOB,
+    .sspad            = GPIOB_NSS,
+    .cr1              = SPI_CR1_BR_1 | SPI_CR1_BR_0,
+    .cr2              = 0U
+};
+
 
 
 /*
@@ -48,15 +59,18 @@ static THD_FUNCTION(trataMensajesRf95, p) {
     event_listener_t newMsgRx_lis, newMsgTx_lis;
 
     chRegSetThreadName("trataMsgRf95");
+    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_setModeRx();
+    spiStop(&SPID1);
     //    msMaxEntreMsgsLlamador = randomNum(100*dsMaxEntreMsgsLlamadorValor()-2000,100*dsMaxEntreMsgsLlamadorValor());
     chEvtRegister(&newMsgRx_source, &newMsgRx_lis, 0);
     chEvtRegister(&newMsgTx_source, &newMsgTx_lis, 1);
     do {
         eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
-        radio::trataRxRf95Radio(evt);
         if (chThdShouldTerminateX())
             chThdExit((msg_t) 1);
+        if (evt!=0)
+            radio::trataRxRf95Radio(evt);
     } while (1==1);
 }
 

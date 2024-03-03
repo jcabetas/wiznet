@@ -2,10 +2,10 @@
 #include "hal.h"
 using namespace chibios_rt;
 #include "string.h"
-#include "calendar.h"
+#include "calendarUTC.h"
 #include "gets.h"
 #include "stdlib.h"
-
+#include "chprintf.h"
 /*
   La hora UTC en España:
   - Durante los siete meses que dura el horario de primavera-verano, España está en la zona UTC +2
@@ -15,9 +15,8 @@ using namespace chibios_rt;
   - El cambio de verano a invierno se hace a las 03:00 del ult. domingo de octubre
 
   Como lo implementamos:
-  - El reloj interno siempre estará en hora local (UTC+1 invierno, UTC+2 verano)
-  - dstflag = 1 en verano, pero el estado lo mantenemos nosotros en la clase "fecha"
-  - Las rutinas de Chibios guardan/leen el dstflag, pero no lo usan (solo en la FAT)
+  - El reloj interno siempre estará en hora UTC
+  - no se usa dstflag del RTC
   - El paso de invierno a verano se hace a manubrio, con fechas preestablecidas (struct tm)
 
  Estructuras de datos:
@@ -70,7 +69,9 @@ using namespace chibios_rt;
 
 extern "C" {
     void checkRTC(void);
+    void ajustaCALMP_C(int16_t dsDia);
 }
+void printSerialCPP(const char *msg);
 
 
 /*
@@ -79,9 +80,7 @@ extern "C" {
 const uint8_t month_len[12] = {
   31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
-static const uint16_t accu_month_len[12] = {
-  0, 31, 59,  90, 120, 151, 181, 212, 243, 273, 304, 334
-};
+
 
 
 static void rtc_enter_init(RTCDriver *RTCD1) {
@@ -124,23 +123,6 @@ static void rtc_tr2tmt(const uint32_t tr, struct tm *tim) {
 }
 
 
-/*
- * complete day of year, and day of the week
- */
-void completeYdayWday(struct tm *tim)
-{
-    uint16_t year;
-    uint8_t isLeapYear;
-    /* compute day of year, even for leap year */
-    year = tim->tm_year + 1900;
-    tim->tm_yday = tim->tm_mday - 1;
-    tim->tm_yday += accu_month_len[tim->tm_mon];
-    isLeapYear = (year%4 == 0 && year%100 != 0) || year%400 == 0;
-    if (isLeapYear && tim->tm_mon>1)
-        tim->tm_yday++;
-    /* compute day of the week */
-    tim->tm_wday = dayofweek(year, tim->tm_mon+1, tim->tm_mday);
-}
 
 /*
  *  tm_mday int day of the month            1-31
@@ -160,7 +142,7 @@ static void rtc_dr2tmd(const uint32_t dr, struct tm *tim) {
     if (tim->tm_mday>31)
         tim->tm_mday = 31;
     tim->tm_wday = (dr >> RTC_DR_WDU_OFFSET) & 7;
-    completeYdayWday(tim);
+    calendar::completeYdayWday(tim);
 }
 
 /*
@@ -234,20 +216,23 @@ static uint32_t rtc_tmd2dr(const struct tm *tim) {
  *
  * @notapi
  */
-void rtcSetTM(RTCDriver *rtcp, struct tm *tim, uint16_t ds, uint8_t esHoraVerano)  {
+void rtcSetTM(RTCDriver *rtcp, struct tm *tim, uint16_t ds)  {
   uint32_t dr, tr;
   syssts_t sts;
 
   tr = rtc_tmt2tr(tim);
   dr = rtc_tmd2dr(tim);
 
-  // ajuste verano/invierno
-  tim->tm_isdst = esHoraVerano;
+  // ajuste verano/invierno => no se usa
+  tim->tm_isdst = 0;
 
   /* Entering a reentrant critical zone.*/
   sts = osalSysGetStatusAndLockX();
 
   /* Writing the registers.*/
+  RTCD1.rtc->WPR = 0xCA;
+  RTCD1.rtc->WPR = 0x53;
+
   rtc_enter_init(&RTCD1);
   rtcp->rtc->TR = tr;
   rtcp->rtc->DR = dr;
@@ -256,7 +241,7 @@ void rtcSetTM(RTCDriver *rtcp, struct tm *tim, uint16_t ds, uint8_t esHoraVerano
                   (tim->tm_isdst << RTC_CR_BKP_OFFSET);
 
   rtc_exit_init(&RTCD1);
-
+  RTCD1.rtc->WPR = 0xFF;
   /* Leaving a reentrant critical zone.*/
   osalSysRestoreStatusX(sts);
 }
@@ -342,6 +327,32 @@ void rtcGetTM(RTCDriver *rtcp, struct tm *tim, uint16_t *ds) {
 ////  *ds = dsec;
 //}
 
+
+void ajustaCALMP(int16_t dsDia)
+{
+    // hay que calcular cuantos pulsos hay que enmascarar dsDia/864000*32768*32
+    if (dsDia>400 || dsDia<-400)
+        return;
+    int16_t pulsos2mask = (int16_t)((dsDia*4096L)/3375L);
+    RTCD1.rtc->WPR = 0xCA;       // Disable write protection
+    RTCD1.rtc->WPR = 0x53;
+    if (dsDia>0) // hay que anyadir pulsos, CALP es 1
+    {
+        RTCD1.rtc->CALR = (512 - pulsos2mask);
+        RTCD1.rtc->CALR |= RTC_CALR_CALP;
+    }
+    else
+    {
+        RTCD1.rtc->CALR = -pulsos2mask;
+    }
+    RTCD1.rtc->WPR = 0xBB;       // enable write protection
+}
+
+void ajustaCALMP_C(int16_t dsDia)
+{
+    ajustaCALMP(dsDia);
+}
+
 void checkRTC(void)
 {
     // check
@@ -354,7 +365,7 @@ void checkRTC(void)
     tim.tm_sec = 0;
     tim.tm_min = 30;
     tim.tm_hour = 9;
-    rtcSetTM(&RTCD1,&tim, 0, 1);
+    rtcSetTM(&RTCD1,&tim, 0);
     rtcGetTM(&RTCD1, &tim, &ds);
 }
 

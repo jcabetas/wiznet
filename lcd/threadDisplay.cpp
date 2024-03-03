@@ -21,7 +21,7 @@ thread_t *procesoLCD = NULL;
 event_source_t updateLCD_source;
 extern struct queu_t colaMsgLcd;
 
-static THD_WORKING_AREA(waLCD, 2024);
+static THD_WORKING_AREA(waLCD, 1024);
 
 static THD_FUNCTION(threadLCD, arg) {
     (void) arg;

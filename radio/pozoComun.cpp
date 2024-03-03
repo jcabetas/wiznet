@@ -15,7 +15,7 @@ using namespace chibios_rt;
 
 #include "colas.h"
 #include "radio.h"
-#include "calendar.h"
+#include "calendarUTC.h"
 
 #include <stdlib.h>
 

@@ -139,7 +139,7 @@ CSRC = $(ALLCSRC) \
 # setting.
 CPPSRC = $(ALLCPPSRC) \
          w25q16/w25q16.cpp variables/varsGestion.cpp variables/volcarFlash.cpp variables/variables.cpp version.cpp \
-         calendar/calendar.cpp calendar/rtcV2.cpp \
+         calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
          serial.cpp tty/gets.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp \
          rf95/rf95.cpp rf95/RH_RF95.cpp \
          radio/pozoComun.cpp radio/tratamientoMsgRF95.cpp radio/llamador.cpp  radio/radio.cpp\

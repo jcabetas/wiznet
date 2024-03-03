@@ -11,7 +11,7 @@
 #include "chprintf.h"
 #include "lcd.h"
 #include "colas.h"
-#include "calendar.h"
+#include "calendarUTC.h"
 #include <RH_RF95.h>
 
 using namespace chibios_rt;
@@ -94,8 +94,10 @@ static THD_FUNCTION(rf95int, p) {
         chThdExit((msg_t) 1);
     if (evt == 0)  // timeout
         continue;
+    spiStart(&SPID1, &spicfgRF95);
     tipoPaq = RH_RF95_handleInterrupt();
     RH_RF95_setModeRx();
+    spiStop(&SPID1);
     if (tipoPaq==paqRx)
     {
         uint8_t size = _bufLen-4;
@@ -153,12 +155,11 @@ void initRF95(void)
     chThdSleepMilliseconds(15);
     palEnableLineEvent(LINE_PA10, PAL_EVENT_MODE_RISING_EDGE);
     palSetLineCallback(LINE_PA10, f2_cb, NULL);
-    spiStart(&SPID1, &spicfgRF95);
     chEvtObjectInit(&newMsgRx_source);
     chEvtObjectInit(&newMsgTx_source);
     if (!procesoRf95Int)
         procesoRf95Int = chThdCreateStatic(rf95int_wa, sizeof(rf95int_wa), NORMALPRIO + 7,  rf95int, NULL);
-
+    spiStart(&SPID1, &spicfgRF95);
     if (!RH_RF95_init())
     {
         chLcdprintfFila(3,"RF95init failed!!");
@@ -169,5 +170,6 @@ void initRF95(void)
     }
     RH_RF95_setFrequency(434.0f);
     RH_RF95_setModeRx();
+    spiStop(&SPID1);
     chLcdprintfFila(3,"RF95 a 434.0MHz");
 }

@@ -13,6 +13,7 @@ using namespace chibios_rt;
 #include "w25q16.h"
 #include "variables.h"
 #include "string.h"
+#include "chprintf.h"
 
 uint16_t modoRadio;
 uint16_t sOlvido;
@@ -39,17 +40,32 @@ extern "C" {
  * Si la EEPROM es valida, los dos primeros bytes seran 0x7851
  *
  */
+BaseSequentialStream * ttyCOM = (BaseSequentialStream *)&SD1;
+
+
+void imprimeVariables(void)
+{
+    chprintf(ttyCOM,"- Modo radio: %d,  T. Olvido: %d s\n",modoRadio, sOlvido);
+    chprintf(ttyCOM,"- Id llamador: %d,  ds max entre msgs:%d s,  ds min:%d\n",idLlamador, dsMaxEntreMsgsLlamador, dsMinEntreMsgsLlamador);
+    chprintf(ttyCOM,"- Bloqueo abusones: %d,  avisaAbuso:%d,  tiempo abuso :%d min, ds max entre msgs:%d s,  ds min:%d\n",
+             bloqueoAbusones, avisaAbuso, tiempoAbuso, dsMaxEntreMsgsPozo, dsMinEntreMsgsPozo);
+}
 
 
 uint8_t leeVariables(void)
 {
+  chprintf(ttyCOM,"Leo variables\n");
 //  initSpiPinsCPP();
   uint16_t hayW25q16 = W25Q16_start();
   if (hayW25q16)
   {
+      chprintf(ttyCOM,"- Detectado flash\n");
       uint16_t claveEEprom = W25Q16_read_u16(0, 0);
       if (claveEEprom != 0x7851)
+      {
+          chprintf(ttyCOM,"- No esta inicializada... la reseteamos\n");
           reseteaEeprom();
+      }
 
       modoRadio = W25Q16_read_u16(0, POSMODORADIO);
       sOlvido = W25Q16_read_u16(0, POSSOLVIDO);
@@ -63,10 +79,10 @@ uint8_t leeVariables(void)
       tiempoAbuso = W25Q16_read_u16(0, POSTIEMPOABUSOMINUTOS);
       dsMaxEntreMsgsPozo = W25Q16_read_u16(0, POSDSMAXENTREMSGSPOZO);
       dsMinEntreMsgsPozo = W25Q16_read_u16(0, POSDSMINENTREMSGSPOZO);
-
   }
   else
   {
+      chprintf(ttyCOM,"- No hay flash, uso valores de defecto\n");
       // valores de defecto por si no puede leer flash
       modoRadio = 1; // 1:llamador, 2:pozo
       sOlvido = 500;
@@ -122,6 +138,7 @@ void escribeVariables(void)
 void leeVariablesC(void)
 {
   leeVariables();
+  imprimeVariables();
 }
 
 
