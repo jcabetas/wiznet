@@ -59,7 +59,7 @@ endif
 # Stack size to be allocated to the Cortex-M process stack. This stack is
 # the stack used by the main() thread.
 ifeq ($(USE_PROCESS_STACKSIZE),)
-  USE_PROCESS_STACKSIZE = 0x800
+  USE_PROCESS_STACKSIZE = 0xB00
 endif
 
 # Stack size to the allocated to the Cortex-M main/exceptions stack. This
@@ -142,8 +142,9 @@ CPPSRC = $(ALLCPPSRC) \
          calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
          serial.cpp tty/gets.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp \
          rf95/rf95.cpp rf95/RH_RF95.cpp \
-         radio/pozoComun.cpp radio/tratamientoMsgRF95.cpp radio/llamador.cpp  radio/radio.cpp\
-         colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp
+         radio/pozoComun.cpp radio/tratamientoMsgRF95.cpp radio/llamador.cpp radio/pozo.cpp radio/radio.cpp\
+         colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp \
+         modbus/modbus.cpp modbus/sdm120ct.cpp modbus/crc.cpp modbus/dispositivos.cpp
          
 
 #         usbSource/serialUSB.cpp w25q16/varsFlash.cpp
@@ -178,7 +179,7 @@ UDEFS = -DCHPRINTF_USE_FLOAT=TRUE
 UADEFS =
 
 # List all user directories here
-UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo
+UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo modbus
 
 # List the user directory to look for the libraries here
 ULIBDIR =

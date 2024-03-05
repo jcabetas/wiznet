@@ -20,6 +20,8 @@ extern "C" {
 }
 
 void initColaMsgLcd(void);
+void initColaMsgRx(void);
+void initColaMsgTx(void);
 
 uint8_t putQueuC(struct queu_t *colaMed, void *ptrStructOrigen)
 {
@@ -97,4 +99,6 @@ void initQueu(struct queu_t *cola, mutex_t *mutexCola, uint8_t numElementos,
 void initColas(void)
 {
     initColaMsgLcd();
+    initColaMsgRx();
+    initColaMsgTx();
 }

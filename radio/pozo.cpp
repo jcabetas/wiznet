@@ -15,15 +15,15 @@ using namespace chibios_rt;
 #include <stdio.h>
 #include "RH_RF95.h"
 #include "colas.h"
-#include "tipoVars.h"
-#include "bloques.h"
-#include "nextion.h"
-#include "bloques.h"
 #include "radio.h"
-#include "calendar.h"
+#include "calendarUTC.h"
 
 time_t GetTimeUnixSec(void);
 
+extern "C"
+{
+    void pozoInit(void);
+}
 
 extern RTCDateTime dateTimeEnvioAnterior;
 
@@ -43,8 +43,13 @@ uint32_t msEntreFechas(RTCDateTime *fechaNew, RTCDateTime *fechaOld);
 int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
 
-
-extern varSTR50 telefAdm;
+extern uint16_t modoRadio;
+extern uint16_t sOlvido;
+extern uint16_t bloqueoAbusones;
+extern uint16_t avisaAbuso;
+extern uint16_t tiempoAbuso;         // minutos
+extern uint16_t dsMaxEntreMsgsPozo;
+extern uint16_t dsMinEntreMsgsPozo;
 
 /*
  * Envia MSG_STATUSPOZO
@@ -56,58 +61,20 @@ extern varSTR50 telefAdm;
  *
  */
 // POZO bOn.radio.pic.0 [dsMin 5] [dsMax 100] [blAbus 1] [tAbus 10] [sOlv 50] pozo.logPozo.txt llam.radio.txt act.radio.txt abu.radio.txt
-pozo::pozo(BaseSequentialStream *tty,uint8_t numPar, char *pars[], uint8_t *hayError)
+pozo::pozo(void)
 {
-    uint8_t tipoNextion, picBase;
-    if (numPar!=11)
-    {
-        nextion::enviaLog(tty,"#parametros incorrectos POZO");
-        *hayError = 1;
-        return;
-    }
     modoRadio = MODOPOZO;
-    numOutput = estados::addEstado(tty, pars[1], 1, hayError);
-    dsMinEntreMsgsPozo = parametro::addParametroU16FlashMinMax(tty, pars[2],2,60,hayError);
-    dsMaxEntreMsgsPozo = parametro::addParametroU16FlashMinMax(tty, pars[3],50,3600,hayError);
-    if (!strcasecmp(pars[4],"NO") || !strcasecmp(pars[4],"0"))
-        bloqueoAbusones = new parametroU16Flash(pars[4], 1, 0, 1);
-    else if (!strcasecmp(pars[4],"SI") || !strcasecmp(pars[4],"1"))
-        bloqueoAbusones = new parametroU16Flash(pars[4], 0, 0, 1);
-    else
-        bloqueoAbusones = new parametroU16Flash(pars[4], 0, 0, 1);
-    tiempoAbuso = parametro::addParametroU16FlashMinMax(tty, pars[5],0,600,hayError); // minutos
-    sOlvido = parametro::addParametroU16FlashMinMax(tty, pars[6],10,600,hayError);    // segundos
-    // nextion pozo
-    hallaNombreyDatosNextion(pars[7], TIPONEXTIONSTR, &idNombreLog, &idNombreLogWWW, &idPageLog, &tipoNextion, &picBase);
-    hallaNombreyDatosNextion(pars[8], TIPONEXTIONSILENCIO, &idNombreLlamadores, &idNombreLlamadoresWWW, &idPageLlamadores, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-        nextion::enviaLog(tty,"POZO llamadores no txt");
-        *hayError = 1;
-    }
-    // nextion activos
-    hallaNombreyDatosNextion(pars[9], TIPONEXTIONSILENCIO, &idNombreActivos, &idNombreActivosWWW, &idPageActivos, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-        nextion::enviaLog(tty,"POZO activos no txt");
-        *hayError = 1;
-    }
-    // nextion abusones
-    hallaNombreyDatosNextion(pars[10], TIPONEXTIONSILENCIO, &idNombreAbusones, &idNombreAbusonesWWW, &idPageAbusones, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-         nextion::enviaLog(tty,"POZO abusones no txt");
-         *hayError = 1;
-    }
     radioPtr = this;
+    palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
+    bombaPozoOn = 0;
+    palClearLine(LINE_RELE);
 }
-
 
 
 void pozo::reseteaVariablesEspecificas(void)
 {
-    dsAleatorioMinEntreMsgsPozo= dsMinEntreMsgsPozo->valor()+randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
-    dsAleatorioMaxEntreMsgsPozo = dsMaxEntreMsgsPozo->valor()+randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
+    dsAleatorioMinEntreMsgsPozo= dsMinEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
+    dsAleatorioMaxEntreMsgsPozo = dsMaxEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
     // errores de Jandro
     // tratamiento de errores de Jandro
     for (int8_t numAviso=0;numAviso<MAXERRORESAVISO;numAviso++)
@@ -117,13 +84,7 @@ void pozo::reseteaVariablesEspecificas(void)
         mensajeAviso[numAviso][0] = 0;
         timeInicioAvisoError[numAviso] = calendar::getSecUnix();
     }
-    estados::ponEstado(numOutput, 0);//palClearPad(GPIOB, GPIOB_RELE);
 }
-
-
-
-
-
 
 
 /*
@@ -132,7 +93,7 @@ void pozo::reseteaVariablesEspecificas(void)
 int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
 {
     uint8_t encontrado, slot;
-    struct tm ahora;
+//    struct tm ahora;
     if (numEstacion<1 || numEstacion>8)
         return -1;
     encontrado = radio::buscoSlot(1, numEstacion, &slot);
@@ -145,14 +106,10 @@ int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
     }
     // actualizo time y mensaje del slot
     timeInicioAvisoError[slot] = calendar::getSecUnix();
-    calendar::getFecha(&ahora);
-    chsnprintf((char *)mensajeAviso[slot],sizeof(mensajeAviso[slot]),"%d/%d %d:%d",ahora.tm_mday, ahora.tm_mon+1,ahora.tm_hour,ahora.tm_min);
+    //calendar::getFecha(&ahora);
+    //chsnprintf((char *)mensajeAviso[slot],sizeof(mensajeAviso[slot]),"%d/%d %d:%d",ahora.tm_mday, ahora.tm_mon+1,ahora.tm_hour,ahora.tm_min);
     return slot;
 }
-
-
-
-
 
 
 uint8_t pozo::quitarAbuso(uint8_t numEstacion)
@@ -233,7 +190,7 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
  */
 uint8_t pozo::estadoPeticionBomba(void)
 {
-    if (bloqueoAbusones->valor())
+    if (bloqueoAbusones)
         return (uint8_t ) ((estadoLlamaciones & ~estadoAbusones)>0);
     else
         return (uint8_t ) (estadoLlamaciones>0);
@@ -258,20 +215,20 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     estadoActivos |= (1<<estacionMsgMenosUno);
     uint8_t estabaPidiendo = (estadoLlamaciones>>estacionMsgMenosUno) & 1;
     uint8_t estabaAbusando = (estadoAbusones>>estacionMsgMenosUno) & 1;
-    if (!bloqueoAbusones->valor() && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
+    if (!bloqueoAbusones && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
     {
         estadoAbusones &=  ~(1<<estacionMsgMenosUno);  // si abusaba, ya no
         enviaClearErrorPozo(1, estacionMsg);
         limpiaError(estacionMsg, 1);
     }
     // posible abuso?
-    if (bloqueoAbusones->valor() && !estabaAbusando && estabaPidiendo && petBombaMsg
-            && (ahora-timeInicioPeticion[estacionMsgMenosUno]>tiempoAbuso->valor()))
+    if (bloqueoAbusones && !estabaAbusando && estabaPidiendo && petBombaMsg
+            && (ahora-timeInicioPeticion[estacionMsgMenosUno]>tiempoAbuso))
     {
         estadoAbusones |= (1<<estacionMsgMenosUno);
         uint8_t slot = actualizoErrorDesdePozo(estacionMsg);
         enviaErrorPozo(slot);
-        if (avisaAbuso->valor() && bloqueoAbusones->valor())
+        if (avisaAbuso && bloqueoAbusones)
         {
             // ToDo avisa abuso por SMS
 //            localtime_r(&timeInicioPeticion[estacionMsg],&fechaIni);
@@ -291,9 +248,11 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || estadoAbusones!=estadoAbusonesOld
             || estadoBombaOld!=estadoPeticionBomba() || estadoBombaOld!=estadoPeticionBomba())
     {
-        estados::ponEstado(numOutput, estadoPeticionBomba());
-        ponEnColaRegistrador();     // guardar en SD
-        actualizaNextion(estadoLlamacionesOld, estadoActivosOld, estadoAbusonesOld, estadoPeticionBomba());
+        bombaPozoOn = estadoPeticionBomba();
+        if (bombaPozoOn)
+            palSetLine(LINE_RELE);
+        else
+            palClearLine(LINE_RELE);
         return 1;
     }
     else
@@ -311,7 +270,7 @@ void pozo::trataObsoletoPozo(void)
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
     {
         uint8_t estabaActivo = (estadoActivos>>disp) & 1;
-        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sOlvido->valor())
+        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sOlvido)
         {
             estadoActivos &= ~(1<<disp);
             estadoAbusones &= ~(1<<disp);
@@ -323,13 +282,16 @@ void pozo::trataObsoletoPozo(void)
     if (envioEstado==0)  // hace mucho tiempo que no env�o nada?
     {
         uint32_t dsDif = calendar::dsDiff(&dateTimeEnvioAnterior);
-        if (dsDif>dsMaxEntreMsgsPozo->valor())
+        if (dsDif>dsMaxEntreMsgsPozo)
             envioEstado = 1;
     }
     if (hayCambios)
     {
-        estados::ponEstado(numOutput, estadoPeticionBomba());//actualizaRele();
-//        chEvtBroadcast(&hayCambiosLCD_source);
+        bombaPozoOn = estadoPeticionBomba();
+        if (bombaPozoOn)
+            palSetLine(LINE_RELE);
+        else
+            palClearLine(LINE_RELE);
     }
     if (envioEstado)
     {
@@ -354,7 +316,7 @@ void pozo::trataRx(struct msgRx_t *msgRx)
     // siendo el Pozo, no hare nada con mensajes de otro pozo
     if (msgId==MSG_STATUSPOZO && msgRx->numBytes==5 && msgRx->msg[1]==0 && (msgRx->msg[2] == '0' || msgRx->msg[2] =='1'))
     {
-        nextion::enviaLog(NULL,"Error, varios POZO");
+        //nextion::enviaLog(NULL,"Error, varios POZO");
         return;
     }
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
@@ -401,7 +363,6 @@ void pozo::trataRxRf95(eventmask_t evt)
             RH_RF95_setModeRx();
         }
     }
-
 }
 
 pozo::~pozo()
@@ -430,21 +391,10 @@ void pozo::stop(void)
     paraRadio();
 }
 
-uint8_t pozo::calcula(uint8_t , uint8_t , uint8_t , uint8_t )
+pozo *pozoObj;
+void pozoInit(void)
 {
-    estados::ponEstado(numOutput, estadoPeticionBomba());
-    return 0;
-}
-
-void pozo::addTime(uint16_t , uint8_t , uint8_t , uint8_t , uint8_t )
-{
-}
-
-void pozo::print(BaseSequentialStream *tty)
-{
-    char buffer[60];
-    chsnprintf(buffer,sizeof(buffer),"POZO output:%s-%d",estados::nombre(numOutput),numOutput);
-    if (tty!=NULL)
-        nextion::enviaLog(tty, buffer);
+    pozoObj = new pozo();
+    pozoObj->init();
 }
 

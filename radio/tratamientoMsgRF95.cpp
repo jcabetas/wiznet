@@ -53,7 +53,7 @@ static const SPIConfig spicfgRF95 = {
  * Envia mensajes que pidan ser enviados (en la colaTx)
  * Llama cada segundo a rutinas para vigilar cambios
  */
-static THD_WORKING_AREA(trataMensajesRf95_wa,1200);
+static THD_WORKING_AREA(trataMensajesRf95_wa,2000);
 static THD_FUNCTION(trataMensajesRf95, p) {
     (void)p;
     event_listener_t newMsgRx_lis, newMsgTx_lis;

@@ -55,7 +55,7 @@ struct opcion_t {             // Structure declaration
     const char descOpcion[];
   };
 
-struct opcion_t opcMR   = { &modoRadio, 1 ,2,     "Modo radio (1:llamador, 2:pozo)"};
+struct opcion_t opcMR   = { &modoRadio, 1 ,3,     "Modo radio (1:registr, 2:llamador, 3:pozo)"};
 struct opcion_t opcSO   = { &sOlvido, 60 ,1200,   "Tiempo olvido (s)"};
 struct opcion_t opcID   = { &idLlamador, 1 ,9,    "Id Llamador"};
 struct opcion_t opcTMLL = { &dsMaxEntreMsgsLlamador, 100 ,600, "Tiempo max. entre msgs (ds)"};
@@ -229,11 +229,11 @@ void ajustaVariables(SerialDriver *sdCOM)
             if (result==0 && opcion==1)
                 ajustaValor(bcCOM, &opcMR);
             if (result==0 && opcion==2)
-                ajustaValor(bcCOM, &opcMR);
+                ajustaValor(bcCOM, &opcSO);
             if (result==0 && opcion==3)
-                ajustaValor(bcCOM, &opcAVS);
+                ajustaValor(bcCOM, &opcBLQ);
             if (result==0 && opcion==4)
-                ajustaValor(bcCOM, &opcMR);
+                ajustaValor(bcCOM, &opcAVS);
             if (result==0 && opcion==5)
                 ajustaValor(bcCOM, &opcTAB);
             if (result==0 && opcion==6)

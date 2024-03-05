@@ -20,6 +20,7 @@ using namespace chibios_rt;
 //#include "tipoVars.h"
 #include "radio.h"
 #include "calendarUTC.h"
+#include "lcd.h"
 
 #include <stdlib.h>
 
@@ -34,7 +35,8 @@ extern struct queu_t colaMsgRx;
 extern struct msgRx_t ultMsg;
 
 event_source_t sensor_source;
-extern uint8_t estadoDeseado;
+uint8_t estadoDeseado;
+
 extern uint16_t modoRadio;
 extern uint16_t sOlvido;
 extern uint16_t idLlamador;
@@ -398,6 +400,29 @@ void llamador::update(uint8_t estadoDeseado)
     }
 }
 
+void cb_sensor(void *)
+{
+    estadoDeseado = !palReadLine(LINE_SENSOR);
+    if (estadoDeseado)
+        palClearLine(LINE_LED);         // enciende
+    else
+        palSetLine(LINE_LED);           // apagado
+    chSysLockFromISR();
+    chEvtBroadcastI(&sensor_source);
+    chSysUnlockFromISR();
+}
+
+void initSensor(void)
+{
+    estadoDeseado = !palReadLine(LINE_SENSOR);
+    if (estadoDeseado)
+        palClearLine(LINE_LED);         // enciende
+    else
+        palSetLine(LINE_LED);           // apagado
+    palSetLineMode(LINE_SENSOR, PAL_MODE_INPUT);
+    palEnableLineEvent(LINE_SENSOR, PAL_EVENT_MODE_BOTH_EDGES);     // Falling edge creates event
+    palSetLineCallback(LINE_SENSOR, cb_sensor, NULL); // Active callback
+}
 
 
 llamador *llamadorObj;
@@ -407,7 +432,7 @@ llamador *llamadorObj;
 static THD_WORKING_AREA(waThreadLlamador, 1024);
 static THD_FUNCTION(ThreadLlamador, arg) {
   (void)arg;
-
+  uint16_t dsTimeOut = 50;
   event_listener_t el0;
   chRegSetThreadName("llamador");
   llamadorObj = new llamador();
@@ -417,10 +442,15 @@ static THD_FUNCTION(ThreadLlamador, arg) {
     eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
     if (chThdShouldTerminateX())
         chThdExit((msg_t) 1);
-    if (evt == 0)  // timeout
+    dsTimeOut--;
+    if (evt == 0 && dsTimeOut>0)  // timeout
         continue;
+    if (dsTimeOut>0)
+        chLcdprintfFila(3,"Envio estado %d",estadoDeseado);
+    else
+        chLcdprintfFila(3,"Reenvio estado %d",estadoDeseado);
+    dsTimeOut = 50;
     llamadorObj->update(estadoDeseado);
-    chThdSleepMilliseconds(50);
    }
 }
 
@@ -428,6 +458,6 @@ void initLlamador(void)
 {
     if (!procesoLlamador)
         procesoLlamador = chThdCreateStatic(waThreadLlamador, sizeof(waThreadLlamador), NORMALPRIO + 7,  ThreadLlamador, NULL);
-
+    initSensor();
 }
 

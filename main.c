@@ -22,7 +22,13 @@
 
 extern event_source_t updateLCD_source;
 extern event_source_t sensor_source;
-uint8_t estadoDeseado;
+extern uint16_t modoRadio;
+
+extern event_source_t enviaLlamacionMsg_source;
+extern event_source_t enviaPozoMsg_source;
+extern event_source_t registraMsgPozo_source;
+extern event_source_t newMsgRx_source;
+extern event_source_t newMsgTx_source;
 
 uint16_t initW25q16(void);
 void initDisplay(void);
@@ -33,7 +39,9 @@ void initSerialHM10(void);
 void initRF95(void);
 void initSpiPins(void);
 void initLlamador(void);
+void pozoInit(void);
 void initCalendar(void);
+void testMB(void);
 
 void leeVariablesC(void);
 void ponEnLCDC(uint8_t fila, char const msg[]);
@@ -79,33 +87,8 @@ void initSD1(void)
     configSD1.cr2 = USART_CR2_STOP1_BITS;// | USART_CR2_LINEN;;
     configSD1.cr3 = 0;
     sdStart(&SD1, &configSD1);
-    chprintf((BaseSequentialStream *)&SD1,"Prueba de SD1\n");
-    chprintf((BaseSequentialStream *)&SD1,"Segunda linea\n");
 }
 
-void cb_sensor(void *)
-{
-    estadoDeseado = !palReadLine(LINE_SENSOR);
-    if (estadoDeseado)
-        palClearLine(LINE_LED);         // enciende
-    else
-        palSetLine(LINE_LED);           // apagado
-    chSysLockFromISR();
-    chEvtBroadcastI(&sensor_source);
-    chSysUnlockFromISR();
-}
-
-void initSensor(void)
-{
-    estadoDeseado = !palReadLine(LINE_SENSOR);
-    if (estadoDeseado)
-        palClearLine(LINE_LED);         // enciende
-    else
-        palSetLine(LINE_LED);           // apagado
-    palSetLineMode(LINE_SENSOR, PAL_MODE_INPUT);
-    palEnableLineEvent(LINE_SENSOR, PAL_EVENT_MODE_BOTH_EDGES);     // Falling edge creates event
-    palSetLineCallback(LINE_SENSOR, cb_sensor, NULL); // Active callback
-}
 
 void testRele(void)
 {
@@ -126,6 +109,12 @@ int main(void) {
   halInit();
   chSysInit();
 
+  chEvtObjectInit(&enviaLlamacionMsg_source);
+  chEvtObjectInit(&enviaPozoMsg_source);
+  chEvtObjectInit(&registraMsgPozo_source);
+  chEvtObjectInit(&newMsgRx_source);
+  chEvtObjectInit(&newMsgTx_source);
+
   chEvtObjectInit(&updateLCD_source);
   chEvtObjectInit(&sensor_source);
 
@@ -134,17 +123,17 @@ int main(void) {
   initSpiPins();
   initDisplay();
   initSD1();
-  chprintf((BaseSequentialStream *)&SD1,"Arrancado LCD\n");
   chLcdprintfFilaC(3,"Arrancado LCD");
   chThdSleepMilliseconds(100);
   leeVariablesC();
-  chprintf((BaseSequentialStream *)&SD1,"Leido variables\n");
   chLcdprintfFilaC(3,"Leido variables");
   chThdSleepMilliseconds(100);
- // testRele();
-  initHM10();
-  initLlamador();
-  initSensor();
+//  initHM10();
+//  if (modoRadio==1)
+//      initLlamador();
+//  if (modoRadio==2)
+//      pozoInit();
+  testMB();
   while (true) {
       chThdSleepMilliseconds(50);
   }

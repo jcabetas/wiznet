@@ -153,6 +153,7 @@ void initRF95(void)
     chThdSleepMilliseconds(2);
     palSetPad(GPIOB, GPIOB_RST_RFM);
     chThdSleepMilliseconds(15);
+    palSetLineMode(LINE_PA10, PAL_MODE_INPUT);
     palEnableLineEvent(LINE_PA10, PAL_EVENT_MODE_RISING_EDGE);
     palSetLineCallback(LINE_PA10, f2_cb, NULL);
     chEvtObjectInit(&newMsgRx_source);

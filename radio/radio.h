@@ -14,9 +14,9 @@
 
 #define SEEDHISTORICO    5674
 
-#define MODOREGISTRADOR 1
-#define MODOLLAMADOR    2
-#define MODOPOZO        3
+#define MODOLLAMADOR    1
+#define MODOPOZO        2
+#define MODOREGISTRADOR 3
 
 #define NUMSATELITES                8
 #define MSG_STATUSPOZO              1
@@ -94,10 +94,6 @@ protected:
     uint16_t dsAleatorioMaxEntreMsgsLlamador;
     struct fechaHora dateTimeEnvioAnterior;
     struct fechaHora dateTimeRxPozoAnterior;
-//    uint16_t idLlamador;
-//    uint16_t dsMaxEntreMsgsLlamador;
-//    uint16_t dsMinEntreMsgsLlamador;
-//    uint16_t sOlvido;
 public:
     llamador(void);
     ~llamador();
@@ -133,18 +129,11 @@ public:
 class pozo: public radio
 {
 protected:
-    uint16_t numOutput;
-    int32_t dsAleatorioMinEntreMsgsPozo;
-    int32_t dsAleatorioMaxEntreMsgsPozo;
     struct fechaHora dateTimeEnvioAnterior;
-    uint16_t *dsMinEntreMsgsPozo;
-    uint16_t *dsMaxEntreMsgsPozo;
-    uint16_t *bloqueoAbusones;
-    uint16_t *avisaAbuso;
-    uint16_t *tiempoAbuso;         // minutos
-    uint16_t *sOlvido;
+    uint16_t dsAleatorioMinEntreMsgsPozo;
+    uint16_t dsAleatorioMaxEntreMsgsPozo;
 public:
-    pozo(BaseSequentialStream *tty,uint8_t numPar, char *pars[], uint8_t *hayError);
+    pozo(void);
     ~pozo();
     void reseteaVariablesEspecificas(void);
     // para implementar "bloque"
@@ -153,10 +142,7 @@ public:
     void stop(void);
     uint8_t calcula(uint8_t hora, uint8_t min, uint8_t seg, uint8_t ds);
     void print(BaseSequentialStream *tty);
-    void addTime(uint16_t dsInc, uint8_t hora, uint8_t min, uint8_t seg, uint8_t ds);
-//    void trataOrdenNextion(char **Vars, uint16_t numVars);
     const char *diTipo(void);
-    // objeto "radio" propiemante dicho
     void reseteaVariables(void);
     uint8_t quitarAbuso(uint8_t numEstacion);
     void onCambioParametrosPozo(void);
@@ -164,9 +150,6 @@ public:
     void actualizoErrorDesdeLlamador(uint8_t numEstacion, uint8_t numError, uint8_t *msgError);
     int8_t actualizoErrorDesdePozo(uint8_t numEstacion);
 
-
-    //void reseteaHistoriaPozo(void);
-    //void apuntaEnergia(float incEner);
     void registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld);
 
     // pozo:
@@ -181,7 +164,6 @@ public:
     void trataRxPozo(struct msgRx_t *msgRx);
     // llamador
     void trataObsoletoLlamador(void);
-    void enviaStatusLlamacion(void);
     uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
     void trataRxRegistradoryLlamador(struct msgRx_t *msgRx);
 
