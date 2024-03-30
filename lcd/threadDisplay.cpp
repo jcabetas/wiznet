@@ -63,9 +63,22 @@ static THD_FUNCTION(threadLCD, arg) {
 //  400000,
 //  FAST_DUTY_CYCLE_2, //STD_DUTY_CYCLE
 //};
+static const I2CConfig i2ccfg = {
+  OPMODE_I2C,
+  400000,
+  FAST_DUTY_CYCLE_2,
+};
+void initI2C(void)
+{
+    palSetLineMode(LINE_SDA2,PAL_MODE_ALTERNATE(9) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
+    palSetLineMode(LINE_SCL2,PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
+    chThdSleepMilliseconds(50); // espera a que se inicie LCD
+    i2cStart(&LCD_I2C, &i2ccfg); // LCD
+}
 
 void initDisplay(void)
 {
+   initI2C();
 #ifdef LCD
     lcd_I2Cinit();
     lcd_CustomChars();

@@ -306,6 +306,10 @@ int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr,
     {
         return 1;
     }
+    if (huboTimeout)     // en blanco, acepto defecto
+    {
+        return 0;
+    }
     error = Str2Int(buffer, &resultado);
     if (error)
     {
@@ -325,3 +329,5 @@ int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr,
     *numeroPtr = resultado;
     return 0;
 }
+
+

@@ -42,8 +42,11 @@ extern uint16_t dsMinEntreMsgsPozo;
 
 
 bool sdHM10open = false;
+bool hayConectadoHM10;
+
 extern uint8_t hayW25q16;
 thread_t *thrHM10 = NULL;
+thread_t *thrConexHM10 = NULL;
 
 
 static const SerialConfig ser_cfg9600 = {9600, 0, 0, 0, };//{115200, 0, 0, 0, };
@@ -111,6 +114,8 @@ void initSerialHM10(void) {
     palSetLine(LINE_RX6);
     palSetLineMode(LINE_RX6, PAL_MODE_ALTERNATE(8));
     palSetLineMode(LINE_TX6, PAL_MODE_ALTERNATE(8));
+
+    //chprintf((BaseSequentialStream*) ttyHM10,"AT+PIO11\r\n"); // el led debe replicar el estado de conexion
     uint8_t estadoHM10 = testHM10(buffer,sizeof(buffer));
     if (estadoHM10 == 1)  // debe haber alguien conectado, todo esta ok
         return;
@@ -285,20 +290,6 @@ uint8_t cambiaNombreModulo(SerialDriver *sdCOM)
 //struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs (ds)"};
 
 
-void esperaConexionHM10(void)
-{
-    char buffer[10];
-    uint8_t huboTimeout;
-    while (true)
-    {
-        chprintf((BaseSequentialStream*) ttyHM10,"AT\r\n");
-        chgetsNoEchoTimeOut((BaseChannel *) ttyHM10, (uint8_t *) buffer, sizeof(buffer), TIME_MS2I(100), &huboTimeout);
-        if (huboTimeout)
-            return; // hay alguien, ya que no devuelve OK
-        chThdSleepMilliseconds(1000);
-    }
-}
-
 
 static THD_WORKING_AREA(waThreadHM10, 1024);
 static THD_FUNCTION(ThreadHM10, arg) {
@@ -309,10 +300,19 @@ static THD_FUNCTION(ThreadHM10, arg) {
     char buff[25];
     BaseSequentialStream *ttyOpciones;
     ttyOpciones = (BaseSequentialStream *)ttyHM10;
+    palSetLineMode(LINE_ENHM10, PAL_MODE_OUTPUT_PUSHPULL);
+    // reseteamos modulo (mantener RESET bajo >100ms)
+    palClearLine(LINE_ENHM10);
+    chThdSleepMilliseconds(120);
+    palSetLine(LINE_ENHM10);
     initSerialHM10();
     while (true)
     {
-        esperaConexionHM10();
+        if (!palReadLine(LINE_STHM10))
+        {
+            chThdSleepMilliseconds(100);
+            continue;
+        }
         chprintf((BaseSequentialStream *)&SD1,"Se han conectado a HM10\n");
         leeVariables();
         chprintf(ttyOpciones,"\n");
@@ -343,7 +343,7 @@ static THD_FUNCTION(ThreadHM10, arg) {
         limpiaBuffer((BaseChannel *) ttyHM10); // por si esta conectado HM-10 y da mensajes de error
         result = preguntaNumero((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 3);
         chprintf(ttyOpciones,"\n");
-        if (result==1)
+        if (result==1 || result ==0)
             continue;
         if (result==0 && opcion==1)
             ajustaVariables(ttyHM10);
@@ -357,7 +357,7 @@ static THD_FUNCTION(ThreadHM10, arg) {
 void initHM10(void)
 {
     if (thrHM10==NULL)
-        chThdCreateStatic(waThreadHM10, sizeof(waThreadHM10), NORMALPRIO, ThreadHM10, NULL);
+        thrHM10 = chThdCreateStatic(waThreadHM10, sizeof(waThreadHM10), NORMALPRIO, ThreadHM10, NULL);
 }
 
 

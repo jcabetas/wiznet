@@ -34,13 +34,8 @@ uint16_t initW25q16(void);
 void initDisplay(void);
 void initColas(void);
 void initHM10(void);
-uint8_t esperaHM10(void);
-void initSerialHM10(void);
-void initRF95(void);
-void initSpiPins(void);
-void initLlamador(void);
+void llamadorInit(void);
 void pozoInit(void);
-void initCalendar(void);
 void testMB(void);
 
 void leeVariablesC(void);
@@ -48,34 +43,22 @@ void ponEnLCDC(uint8_t fila, char const msg[]);
 int chLcdprintfFilaC(uint8_t fila, const char *fmt, ...);
 extern uint8_t hayLcd;
 
-void tickLed(uint8_t numPuls, uint16_t msEntrePuls, stm32_gpio_t *GPIO, uint32_t PAD)
-{
-    for (uint8_t numP=0;numP<numPuls;numP++)
-    {
-        palClearPad(GPIO, PAD);         // enciende
-        palClearPad(GPIOC, GPIOC_LED);         // enciende
-        chThdSleepMilliseconds(100);    // mantiene 100 ms
-        palSetPad(GPIO, PAD);           // apagado
-        palSetPad(GPIOC, GPIOC_LED);         // enciende
-        if (numP<numPuls-1)             // si no es el ultimo, deja apagado 200 ms
-            chThdSleepMilliseconds(200);
-    }
-    chThdSleepMilliseconds(msEntrePuls);
-}
+//void tickLed(uint8_t numPuls, uint16_t msEntrePuls, stm32_gpio_t *GPIO, uint32_t PAD)
+//{
+//    for (uint8_t numP=0;numP<numPuls;numP++)
+//    {
+//        palClearPad(GPIO, PAD);         // enciende
+//        palClearPad(GPIOC, GPIOC_LED);         // enciende
+//        chThdSleepMilliseconds(100);    // mantiene 100 ms
+//        palSetPad(GPIO, PAD);           // apagado
+//        palSetPad(GPIOC, GPIOC_LED);         // enciende
+//        if (numP<numPuls-1)             // si no es el ultimo, deja apagado 200 ms
+//            chThdSleepMilliseconds(200);
+//    }
+//    chThdSleepMilliseconds(msEntrePuls);
+//}
 
 
-static const I2CConfig i2ccfg = {
-  OPMODE_I2C,
-  400000,
-  FAST_DUTY_CYCLE_2,
-};
-void initI2C(void)
-{
-    palSetLineMode(LINE_SDA2,PAL_MODE_ALTERNATE(9) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
-    palSetLineMode(LINE_SCL2,PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN | PAL_STM32_OSPEED_HIGHEST);
-    chThdSleepMilliseconds(50); // espera a que se inicie LCD
-    i2cStart(&LCD_I2C, &i2ccfg); // LCD
-}
 
 void initSD1(void)
 {
@@ -119,8 +102,6 @@ int main(void) {
   chEvtObjectInit(&sensor_source);
 
   initColas();
-  initI2C();
-  initSpiPins();
   initDisplay();
   initSD1();
   chLcdprintfFilaC(3,"Arrancado LCD");
@@ -128,11 +109,12 @@ int main(void) {
   leeVariablesC();
   chLcdprintfFilaC(3,"Leido variables");
   chThdSleepMilliseconds(100);
-//  initHM10();
-//  if (modoRadio==1)
-//      initLlamador();
-//  if (modoRadio==2)
-//      pozoInit();
+  initHM10();
+  modoRadio = 1;
+  if (modoRadio==1)
+      llamadorInit();
+  if (modoRadio==2)
+      pozoInit();
   testMB();
   while (true) {
       chThdSleepMilliseconds(50);

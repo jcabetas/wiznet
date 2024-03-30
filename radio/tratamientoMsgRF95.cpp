@@ -59,9 +59,7 @@ static THD_FUNCTION(trataMensajesRf95, p) {
     event_listener_t newMsgRx_lis, newMsgTx_lis;
 
     chRegSetThreadName("trataMsgRf95");
-    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_setModeRx();
-    spiStop(&SPID1);
     //    msMaxEntreMsgsLlamador = randomNum(100*dsMaxEntreMsgsLlamadorValor()-2000,100*dsMaxEntreMsgsLlamadorValor());
     chEvtRegister(&newMsgRx_source, &newMsgRx_lis, 0);
     chEvtRegister(&newMsgTx_source, &newMsgTx_lis, 1);
@@ -89,8 +87,8 @@ void radio::paraRadio(void)
         chThdTerminate(procesoRf95Int);
         chThdWait(procesoRf95Int);
         procesoRf95Int = NULL;
-        palDisableLineEvent(LINE_PA10);
-        spiStop(&SPID1);
+        palDisableLineEvent(LINE_DIO0);
+        spiStop(&SPID3);
         return;
     }
     //BaseSequentialStream *tty, uint16_t idPageLog, uint16_t idNomLog, const char *msg

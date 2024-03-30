@@ -16,11 +16,6 @@
 
 using namespace chibios_rt;
 
-extern "C"
-{
-    void initSpiPins(void);
-}
-
 
 /*
  * Maximum speed SPI configuration (27MHz -BR0==Fpclk/4-, CPHA=0, CPOL=0, MSb first).
@@ -94,10 +89,8 @@ static THD_FUNCTION(rf95int, p) {
         chThdExit((msg_t) 1);
     if (evt == 0)  // timeout
         continue;
-    spiStart(&SPID1, &spicfgRF95);
     tipoPaq = RH_RF95_handleInterrupt();
     RH_RF95_setModeRx();
-    spiStop(&SPID1);
     if (tipoPaq==paqRx)
     {
         uint8_t size = _bufLen-4;
@@ -117,60 +110,51 @@ static THD_FUNCTION(rf95int, p) {
 }
 
 
-void initSpiPins(void)
+void initSpi3Pins(void)
 {
-    /*
-     * SCK -  PA5    SPI1_SCK
-     * MISO - PA6    SPI1_MISO
-     * MOSI - PA7    SPI1_MOSI
-     */
-    palClearLine(LINE_SPI1_SCK);
-    palClearLine(LINE_SPI1_MISO);
-    palClearLine(LINE_SPI1_MOSI);
-    palSetLineMode(LINE_SPI1_SCK,
-                     PAL_MODE_ALTERNATE(5) |
+    palClearLine(LINE_SPI3_SCK);
+    palClearLine(LINE_SPI3_MISO);
+    palClearLine(LINE_SPI3_MOSI);
+    palSetLineMode(LINE_SPI3_SCK,
+                     PAL_MODE_ALTERNATE(6) |
                      PAL_STM32_OSPEED_HIGHEST);         /* SPI SCK.             */
-    palSetLineMode(LINE_SPI1_MISO,
-                     PAL_MODE_ALTERNATE(5) |
+    palSetLineMode(LINE_SPI3_MISO,
+                     PAL_MODE_ALTERNATE(6) |
                      PAL_STM32_OSPEED_HIGHEST);         /* MISO.                */
-    palSetLineMode(LINE_SPI1_MOSI,
-                     PAL_MODE_ALTERNATE(5) |
+    palSetLineMode(LINE_SPI3_MOSI,
+                     PAL_MODE_ALTERNATE(6) |
                      PAL_STM32_OSPEED_HIGHEST);         /* MOSI.                */
 }
 
-void initSpiPinsCPP(void)
-{
-    initSpiPins();
-}
 
 void initRF95(void)
 {
     chEvtObjectInit(&rf95int_event);
-    palSetLine(GPIOB_NSS);
-    palSetLineMode(GPIOB_NSS, PAL_MODE_OUTPUT_PUSHPULL);
-    palSetPadMode(GPIOB, GPIOB_RST_RFM, PAL_MODE_OUTPUT_PUSHPULL);
-    palClearPad(GPIOB, GPIOB_RST_RFM);
+    initSpi3Pins();
+    spiStart(&SPID3, &spicfgRF95);
+    palSetLine(LINE_NSS);
+    palSetLineMode(LINE_NSS, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetLineMode(LINE_RST_RFM, PAL_MODE_OUTPUT_PUSHPULL);
+    palClearLine(LINE_RST_RFM);
     chThdSleepMilliseconds(2);
-    palSetPad(GPIOB, GPIOB_RST_RFM);
+    palSetLine(LINE_RST_RFM);
     chThdSleepMilliseconds(15);
-    palSetLineMode(LINE_PA10, PAL_MODE_INPUT);
-    palEnableLineEvent(LINE_PA10, PAL_EVENT_MODE_RISING_EDGE);
-    palSetLineCallback(LINE_PA10, f2_cb, NULL);
+    palSetLineMode(LINE_DIO0, PAL_MODE_INPUT);
+    palEnableLineEvent(LINE_DIO0, PAL_EVENT_MODE_RISING_EDGE);
+    palSetLineCallback(LINE_DIO0, f2_cb, NULL);
     chEvtObjectInit(&newMsgRx_source);
     chEvtObjectInit(&newMsgTx_source);
     if (!procesoRf95Int)
         procesoRf95Int = chThdCreateStatic(rf95int_wa, sizeof(rf95int_wa), NORMALPRIO + 7,  rf95int, NULL);
-    spiStart(&SPID1, &spicfgRF95);
     if (!RH_RF95_init())
     {
         chLcdprintfFila(3,"RF95init failed!!");
         osalThreadSleepMilliseconds(2000);
-        spiStop(&SPID1);
-        palDisableLineEvent(LINE_PA10);
+        spiStop(&SPID3);
+        palDisableLineEvent(LINE_DIO0);
         return;
     }
     RH_RF95_setFrequency(434.0f);
     RH_RF95_setModeRx();
-    spiStop(&SPID1);
     chLcdprintfFila(3,"RF95 a 434.0MHz");
 }

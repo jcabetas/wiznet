@@ -449,29 +449,29 @@ static const SPIConfig spicfgFlash = {
 };
 
 
-//void initSPI1(void)
-//{
-//    // defino los pines
-//    /*
-//     * CS -   PA4
-//     * SCK -  PA5    SPI1_SCK
-//     * MISO - PA6    SPI1_MISO
-//     * MOSI - PA7    SPI1_MOSI
-//     */
-//    palClearLine(LINE_SPI1_SCK);
-//    palClearLine(LINE_SPI1_MISO);
-//    palClearLine(LINE_SPI1_MOSI);
-//
-//    palSetLineMode(LINE_SPI1_SCK,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* SPI SCK.             */
-//    palSetLineMode(LINE_SPI1_MISO,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* MISO.                */
-//    palSetLineMode(LINE_SPI1_MOSI,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* MOSI.                */
-//}
+void initSPI1pins(void)
+{
+    // defino los pines
+    /*
+     * CS -   PA4
+     * SCK -  PA5    SPI1_SCK
+     * MISO - PA6    SPI1_MISO
+     * MOSI - PA7    SPI1_MOSI
+     */
+    palClearLine(LINE_SPI1_SCK);
+    palClearLine(LINE_SPI1_MISO);
+    palClearLine(LINE_SPI1_MOSI);
+
+    palSetLineMode(LINE_SPI1_SCK,
+                     PAL_MODE_ALTERNATE(5) |
+                     PAL_STM32_OSPEED_HIGHEST);         /* SPI SCK.             */
+    palSetLineMode(LINE_SPI1_MISO,
+                     PAL_MODE_ALTERNATE(5) |
+                     PAL_STM32_OSPEED_HIGHEST);         /* MISO.                */
+    palSetLineMode(LINE_SPI1_MOSI,
+                     PAL_MODE_ALTERNATE(5) |
+                     PAL_STM32_OSPEED_HIGHEST);         /* MOSI.                */
+}
 
 
 /*
@@ -485,6 +485,7 @@ static const SPIConfig spicfgFlash = {
 */
 uint16_t W25Q16_start(void)
 {
+  initSPI1pins();
   palSetLine(LINE_W25Q16_CS);
   palSetLineMode(LINE_W25Q16_CS, PAL_MODE_OUTPUT_PUSHPULL);
   spiStart(&SPID1, &spicfgFlash);

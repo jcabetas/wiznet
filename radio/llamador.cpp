@@ -60,7 +60,7 @@ static const SPIConfig spicfgRF95 = {
 thread_t *procesoLlamador;
 extern "C"
 {
-    void initLlamador(void);
+    void llamadorInit(void);
 }
 
 
@@ -146,13 +146,9 @@ void llamador::enviaStatusLlamacion(void)
         msgTx.msg[2] = '0';
     //putQueu(&colaMsgTx, &msgTx);
     //chEvtBroadcast(&newMsgTx_source);
-    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_send(msgTx.msg,msgTx.numBytes);
-    spiStop(&SPID1);
     RHGenericDriver_waitPacketSent(100);
-    spiStart(&SPID1, &spicfgRF95);
     RH_RF95_setModeRx();
-    spiStop(&SPID1);
     calendar::getFechaHora(&dateTimeEnvioAnterior);
 }
 
@@ -346,13 +342,9 @@ void llamador::trataRxRf95(eventmask_t evt)
     {
         while (getQueu(&colaMsgTx, &msgTx))
         {
-            spiStart(&SPID1, &spicfgRF95);
             RH_RF95_send(msgTx.msg,msgTx.numBytes);
-            spiStop(&SPID1);
             RHGenericDriver_waitPacketSent(100);
-            spiStart(&SPID1, &spicfgRF95);
             RH_RF95_setModeRx();
-            spiStop(&SPID1);
         }
     }
 }
@@ -454,8 +446,11 @@ static THD_FUNCTION(ThreadLlamador, arg) {
    }
 }
 
-void initLlamador(void)
+
+void llamadorInit(void)
 {
+    llamadorObj = new llamador();
+    llamadorObj->init();
     if (!procesoLlamador)
         procesoLlamador = chThdCreateStatic(waThreadLlamador, sizeof(waThreadLlamador), NORMALPRIO + 7,  ThreadLlamador, NULL);
     initSensor();

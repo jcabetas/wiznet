@@ -111,12 +111,12 @@ static const uint8_t MODEM_CONFIG_TABLE[4][3] =
 uint8_t RHSPIDriver_spiRead(uint8_t reg)
 {
 	uint8_t txbf[2], rxbf[2];
-	spiAcquireBus(&SPID1);
+	spiAcquireBus(&SPID3);
 	txbf[0] = reg & ~RH_SPI_WRITE_MASK;
-	spiSelect(&SPID1);
-	spiExchange(&SPID1, 2, txbf, rxbf);
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	spiSelect(&SPID3);
+	spiExchange(&SPID3, 2, txbf, rxbf);
+	spiUnselect(&SPID3);
+	spiReleaseBus(&SPID3);
 	return rxbf[1];
 }
 
@@ -124,37 +124,37 @@ uint8_t RHSPIDriver_spiRead(uint8_t reg)
 uint8_t RHSPIDriver_spiWrite(uint8_t reg, uint8_t val)
 {
 	uint8_t txbf[2], rxbf[2];
-	spiAcquireBus(&SPID1);
+	spiAcquireBus(&SPID3);
 	txbf[0] = reg | RH_SPI_WRITE_MASK;
 	txbf[1] = val;
-	spiSelect(&SPID1);
-	spiExchange(&SPID1, 2, txbf, rxbf);
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	spiSelect(&SPID3);
+	spiExchange(&SPID3, 2, txbf, rxbf);
+	spiUnselect(&SPID3);
+	spiReleaseBus(&SPID3);
 	return TRUE;
 }
 
 uint8_t RHSPIDriver_spiBurstRead(uint8_t reg, uint8_t* dest, uint8_t len)
 {
-	spiAcquireBus(&SPID1);
+	spiAcquireBus(&SPID3);
 	txbuf[0] = reg & ~RH_SPI_WRITE_MASK;
-	spiSelect(&SPID1);
-	spiExchange(&SPID1, 1, txbuf, rxbuf);
-	spiExchange(&SPID1, len, txbuf, dest);
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	spiSelect(&SPID3);
+	spiExchange(&SPID3, 1, txbuf, rxbuf);
+	spiExchange(&SPID3, len, txbuf, dest);
+	spiUnselect(&SPID3);
+	spiReleaseBus(&SPID3);
 	return TRUE;
 }
 
 uint8_t RHSPIDriver_spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
 {
-	spiAcquireBus(&SPID1);
+	spiAcquireBus(&SPID3);
 	txbuf[0] = reg | RH_SPI_WRITE_MASK;
-	spiSelect(&SPID1);
-	spiExchange(&SPID1, 1, txbuf, rxbuf);
-	spiExchange(&SPID1, len, src, rxbuf);
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	spiSelect(&SPID3);
+	spiExchange(&SPID3, 1, txbuf, rxbuf);
+	spiExchange(&SPID3, len, src, rxbuf);
+	spiUnselect(&SPID3);
+	spiReleaseBus(&SPID3);
 	return TRUE;
 }
 
