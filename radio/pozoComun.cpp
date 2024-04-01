@@ -58,9 +58,9 @@ void radio::registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacion
         {
             // registro en memoria permanente
             uint32_t tiempoOn = ahora - timeInicioPeticion[est];
-            struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
-            datos->datosId[est].segundosPeticion += tiempoOn;
-            datos->datosId[est].numPeticiones += 1;
+//            struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+//            datos->datosId[est].segundosPeticion += tiempoOn;
+//            datos->datosId[est].numPeticiones += 1;
         }
     }
 }

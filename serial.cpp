@@ -61,12 +61,12 @@ struct opcion_t {             // Structure declaration
 struct opcion_t opcMR   = { &modoRadio, 1 ,3,     "Modo radio (1:registr, 2:llamador, 3:pozo)"};
 struct opcion_t opcSO   = { &sOlvido, 60 ,1200,   "Tiempo olvido (s)"};
 struct opcion_t opcID   = { &idLlamador, 1 ,9,    "Id Llamador"};
-struct opcion_t opcTMLL = { &dsMaxEntreMsgsLlamador, 100 ,600, "Tiempo max. entre msgs (ds)"};
+struct opcion_t opcTMLL = { &dsMaxEntreMsgsLlamador, 100 ,3000, "Tiempo max. entre msgs (ds)"};
 struct opcion_t opcTmLL = { &dsMinEntreMsgsLlamador, 10 ,100, "Tiempo min. entre msgs (ds)"};
 struct opcion_t opcBLQ  = { &bloqueoAbusones, 0 ,1, "Bloqueo abusones"};
 struct opcion_t opcAVS =  { &avisaAbuso, 0 ,1, "Avisa abuso"};
 struct opcion_t opcTAB =  { &tiempoAbuso, 120 ,1200, "Tiempo abuso (min)"};
-struct opcion_t opcTMPZ = { &dsMaxEntreMsgsPozo, 100 ,1200, "Tiempo max. entre msgs (ds)"};
+struct opcion_t opcTMPZ = { &dsMaxEntreMsgsPozo, 100 ,3000, "Tiempo max. entre msgs (ds)"};
 struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs (ds)"};
 
 
@@ -156,14 +156,14 @@ void ajustaHora(SerialDriver *sdCOM)
     hora = tim.tm_hour;
     min = tim.tm_min;
     sec = tim.tm_sec;
-    if (preguntaNumero((BaseChannel *) sdCOM, "Anyo", &ano, 2023, 2060) == 2)
+    if (preguntaNumeroHM10((BaseChannel *) sdCOM, "Anyo", &ano, 2023, 2060) != 0)
         return;
-    preguntaNumero((BaseChannel *) sdCOM, "Mes", &mes, 1, 12);
-    preguntaNumero((BaseChannel *) sdCOM, "Dia", &dia, 1, 31);
-    preguntaNumero((BaseChannel *) sdCOM, "Hora", &hora, 0, 23);
-    preguntaNumero((BaseChannel *) sdCOM, "Minutos", &min, 0, 59);
-    result = preguntaNumero((BaseChannel *) sdCOM, "Segundos", &sec, 0, 59);
-    if (result==2)
+    preguntaNumeroHM10((BaseChannel *) sdCOM, "Mes", &mes, 1, 12);
+    preguntaNumeroHM10((BaseChannel *) sdCOM, "Dia", &dia, 1, 31);
+    preguntaNumeroHM10((BaseChannel *) sdCOM, "Hora", &hora, 0, 23);
+    preguntaNumeroHM10((BaseChannel *) sdCOM, "Minutos", &min, 0, 59);
+    result = preguntaNumeroHM10((BaseChannel *) sdCOM, "Segundos", &sec, 0, 59);
+    if (result != 0)
         return;
     calendar::cambiaFechaTM(ano-1900, mes-1, dia, hora, min, sec, 0);
     calendar::printFecha(buff,sizeof(buff));
@@ -173,7 +173,7 @@ void ajustaHora(SerialDriver *sdCOM)
 void ajustaValor(BaseChannel *sdCOM, struct opcion_t *opcion)
 {
     uint32_t var32 = *opcion->variable;
-    int16_t result = preguntaNumero(sdCOM, opcion->descOpcion, &var32, opcion->valMin, opcion->valMax);
+    int16_t result = preguntaNumeroHM10(sdCOM, opcion->descOpcion, &var32, opcion->valMin, opcion->valMax);
     if (result == 0)
     {
         *opcion->variable = var32;
@@ -205,19 +205,19 @@ void ajustaVariables(SerialDriver *sdCOM)
             chprintf(ttyCOM,"4 Tiempo max entre msgs: %d ds\n",dsMaxEntreMsgsLlamador);
             chprintf(ttyCOM,"5 Tiempo min entre msgs: %d ds\n",dsMinEntreMsgsLlamador);
             chprintf(ttyCOM,"6 salir\n");
-            result = preguntaNumero((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 6);
+            result = preguntaNumeroHM10((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 6);
             chprintf(ttyCOM,"\n");
-            if (result==2 || (result==0 && opcion==6))
+            if (result != 0 || (result==0 && opcion==6))
                 return;
-            if (result==0 && opcion==1)
+            if (opcion==1)
                 ajustaValor(bcCOM, &opcMR);
-            if (result==0 && opcion==2)
+            if (opcion==2)
                 ajustaValor(bcCOM, &opcSO);
-            if (result==0 && opcion==3)
+            if (opcion==3)
                 ajustaValor(bcCOM, &opcID);
-            if (result==0 && opcion==4)
+            if (opcion==4)
                 ajustaValor(bcCOM, &opcTMLL);
-            if (result==0 && opcion==5)
+            if (opcion==5)
                 ajustaValor(bcCOM, &opcTmLL);
         }
         else
@@ -228,22 +228,22 @@ void ajustaVariables(SerialDriver *sdCOM)
             chprintf(ttyCOM,"6 Tiempo max entre msgs: %d (ds)\n",dsMaxEntreMsgsPozo);
             chprintf(ttyCOM,"7 Tiempo min entre msgs: %d (ds)\n",dsMinEntreMsgsPozo);
             chprintf(ttyCOM,"8 salir\n");
-            result = preguntaNumero((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 8);
-            if (result==2 || (result==0 && opcion==8))
+            result = preguntaNumeroHM10((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 8);
+            if (result != 0 || (result==0 && opcion==8))
                 return;
-            if (result==0 && opcion==1)
+            if (opcion==1)
                 ajustaValor(bcCOM, &opcMR);
-            if (result==0 && opcion==2)
+            if (opcion==2)
                 ajustaValor(bcCOM, &opcSO);
-            if (result==0 && opcion==3)
+            if (opcion==3)
                 ajustaValor(bcCOM, &opcBLQ);
-            if (result==0 && opcion==4)
+            if (opcion==4)
                 ajustaValor(bcCOM, &opcAVS);
-            if (result==0 && opcion==5)
+            if (opcion==5)
                 ajustaValor(bcCOM, &opcTAB);
-            if (result==0 && opcion==6)
+            if (opcion==6)
                 ajustaValor(bcCOM, &opcTMPZ);
-            if (result==0 && opcion==7)
+            if (opcion==7)
                 ajustaValor(bcCOM, &opcTmPZ);
         }
     }
@@ -314,6 +314,7 @@ static THD_FUNCTION(ThreadHM10, arg) {
             continue;
         }
         chprintf((BaseSequentialStream *)&SD1,"Se han conectado a HM10\n");
+        chThdSleepMilliseconds(1000);
         leeVariables();
         chprintf(ttyOpciones,"\n");
         chprintf(ttyOpciones,"GIT Tag:%s Commit:%s\n",GIT_TAG,GIT_COMMIT);
@@ -341,15 +342,15 @@ static THD_FUNCTION(ThreadHM10, arg) {
         chprintf(ttyOpciones,"3 Cambiar nombre modulo\n");
 
         limpiaBuffer((BaseChannel *) ttyHM10); // por si esta conectado HM-10 y da mensajes de error
-        result = preguntaNumero((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 3);
+        result = preguntaNumeroHM10((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 3);
         chprintf(ttyOpciones,"\n");
-        if (result==1 || result ==0)
+        if (result != 0)
             continue;
-        if (result==0 && opcion==1)
+        if (opcion==1)
             ajustaVariables(ttyHM10);
-        if (result==0 && opcion==2)
+        if (opcion==2)
             ajustaHora(ttyHM10);
-        if (result==0 && opcion==3)
+        if (opcion==3)
             cambiaNombreModulo(ttyHM10);
     }
 }

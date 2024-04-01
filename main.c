@@ -27,6 +27,7 @@ extern uint16_t modoRadio;
 extern event_source_t enviaLlamacionMsg_source;
 extern event_source_t enviaPozoMsg_source;
 extern event_source_t registraMsgPozo_source;
+extern event_source_t rf95int_source;
 extern event_source_t newMsgRx_source;
 extern event_source_t newMsgTx_source;
 
@@ -92,14 +93,16 @@ int main(void) {
   halInit();
   chSysInit();
 
+  chEvtObjectInit(&sensor_source);
   chEvtObjectInit(&enviaLlamacionMsg_source);
   chEvtObjectInit(&enviaPozoMsg_source);
   chEvtObjectInit(&registraMsgPozo_source);
+
+  chEvtObjectInit(&rf95int_source);
   chEvtObjectInit(&newMsgRx_source);
   chEvtObjectInit(&newMsgTx_source);
 
   chEvtObjectInit(&updateLCD_source);
-  chEvtObjectInit(&sensor_source);
 
   initColas();
   initDisplay();
@@ -115,7 +118,7 @@ int main(void) {
       llamadorInit();
   if (modoRadio==2)
       pozoInit();
-  testMB();
+  //testMB();
   while (true) {
       chThdSleepMilliseconds(50);
   }

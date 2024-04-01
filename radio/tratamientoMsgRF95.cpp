@@ -31,6 +31,10 @@ extern uint8_t cnt;
 //extern varMODOPOZO modopozo;
 //extern uint8_t checkTrataMsgRf95;
 
+
+extern event_source_t rf95int_event;
+
+
 void initRF95(void);
 
 thread_t *procesoMsgRf95;
@@ -48,29 +52,7 @@ static const SPIConfig spicfgRF95 = {
 
 
 
-/*
- * Trata mensajes recibidos por rf95     (en la colaRx)
- * Envia mensajes que pidan ser enviados (en la colaTx)
- * Llama cada segundo a rutinas para vigilar cambios
- */
-static THD_WORKING_AREA(trataMensajesRf95_wa,2000);
-static THD_FUNCTION(trataMensajesRf95, p) {
-    (void)p;
-    event_listener_t newMsgRx_lis, newMsgTx_lis;
 
-    chRegSetThreadName("trataMsgRf95");
-    RH_RF95_setModeRx();
-    //    msMaxEntreMsgsLlamador = randomNum(100*dsMaxEntreMsgsLlamadorValor()-2000,100*dsMaxEntreMsgsLlamadorValor());
-    chEvtRegister(&newMsgRx_source, &newMsgRx_lis, 0);
-    chEvtRegister(&newMsgTx_source, &newMsgTx_lis, 1);
-    do {
-        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
-        if (chThdShouldTerminateX())
-            chThdExit((msg_t) 1);
-        if (evt!=0)
-            radio::trataRxRf95Radio(evt);
-    } while (1==1);
-}
 
 
 
@@ -101,7 +83,6 @@ void radio::arrancaRadio(void)
     if (!procesoMsgRf95)
     {
         initRF95();
-        procesoMsgRf95 = chThdCreateStatic(trataMensajesRf95_wa, sizeof(trataMensajesRf95_wa), NORMALPRIO,  trataMensajesRf95, NULL);
     }
 }
 

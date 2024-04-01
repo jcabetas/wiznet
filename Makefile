@@ -179,7 +179,7 @@ UDEFS = -DCHPRINTF_USE_FLOAT=TRUE
 UADEFS =
 
 # List all user directories here
-UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo modbus
+UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo modbus radio
 
 # List the user directory to look for the libraries here
 ULIBDIR =

@@ -127,6 +127,42 @@ void chgetsNoEchoTimeOut(BaseChannel   *pSD, uint8_t *buffer, uint16_t bufferSiz
     buffer[pos]=0;
 }
 
+void chgetsNoEchoTimeOutHM10(BaseChannel   *pSD, uint8_t *buffer, uint16_t bufferSize,systime_t timeout, uint8_t *huboTimeout)
+{
+    uint8_t ch;
+    uint16_t pos=0;
+    *huboTimeout = 0;
+    while (1==1)
+      {
+      ch = chgetchTimeOut(pSD, TIME_MS2I(100), huboTimeout);
+      if (*huboTimeout) // timeout
+      {
+          if (timeout < TIME_MS2I(100))
+          {
+              *huboTimeout = 1;
+              break;
+          }
+          else
+          {
+              if (!palReadLine(LINE_STHM10)) // si no hay conexion, aborta
+              {
+                  *huboTimeout = 1;
+                  buffer[0] = 0;
+                  break;
+              }
+              timeout -= TIME_MS2I(100);
+              continue;
+          }
+      }
+      if (ch=='\r')
+         continue;
+      if (ch=='\n')
+         break;
+      if (pos<bufferSize)
+        buffer[pos++] = ch;
+      }
+    buffer[pos]=0;
+}
 
 // mensajes desde nextion. Empiezan en @ y terminan en 0
 void chgetNextionNoEchoTimeOut(BaseChannel   *pSD, uint8_t *buffer, uint16_t bufferSize,systime_t timeout, uint16_t *numBytes, uint8_t *huboTimeout)
@@ -302,32 +338,73 @@ int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr,
     chgetsNoEchoTimeOut(ttyBC, buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
 //    chgets(ttyBC, buffer,sizeof(buffer));
     chprintf((BaseSequentialStream *)tty,"\n\r");
-    if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
+    if (huboTimeout)     // timeout, abortar
     {
-        return 1;
-    }
-    if (huboTimeout)     // en blanco, acepto defecto
-    {
-        return 0;
-    }
-    error = Str2Int(buffer, &resultado);
-    if (error)
-    {
-        chprintf((BaseSequentialStream *)tty,"Numero invalido!!\n\r");
         return 2;
+    }
+    if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
+        resultado = *numeroPtr;
+    else
+    {
+        error = Str2Int(buffer, &resultado);
+        if (error)
+        {
+            chprintf((BaseSequentialStream *)tty,"Numero invalido!!\n\r");
+            return 3;
+        }
     }
     if (resultado>valorMax)
     {
         chprintf((BaseSequentialStream *)tty,"Demasiado alto!!\n\r");
-        return 3;
+        return 4;
     }
     if (resultado<valorMin)
     {
         chprintf((BaseSequentialStream *)tty,"Demasiado bajo!!\n\r");
-        return 4;
+        return 5;
     }
     *numeroPtr = resultado;
     return 0;
 }
 
+int16_t preguntaNumeroHM10(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax)
+{
+    uint8_t buffer[50];
+    int16_t error;
+    uint32_t resultado;
+    uint8_t huboTimeout;
+    BaseSequentialStream *tty = (BaseSequentialStream *)ttyBC;
+    chprintf((BaseSequentialStream *)tty,msg);
+    chprintf((BaseSequentialStream *)tty," [%d...%d]:", valorMin, valorMax);
+    chgetsNoEchoTimeOutHM10(ttyBC, buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
+//    chgets(ttyBC, buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)tty,"\n\r");
+    if (huboTimeout)     // timeout, abortar
+    {
+        return 2;
+    }
+    if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
+        resultado = *numeroPtr;
+    else
+    {
+        error = Str2Int(buffer, &resultado);
+        if (error)
+        {
+            chprintf((BaseSequentialStream *)tty,"Numero invalido!!\n\r");
+            return 3;
+        }
+    }
+    if (resultado>valorMax)
+    {
+        chprintf((BaseSequentialStream *)tty,"Demasiado alto!!\n\r");
+        return 4;
+    }
+    if (resultado<valorMin)
+    {
+        chprintf((BaseSequentialStream *)tty,"Demasiado bajo!!\n\r");
+        return 5;
+    }
+    *numeroPtr = resultado;
+    return 0;
+}
 

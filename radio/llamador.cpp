@@ -30,12 +30,16 @@ int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
 extern struct queu_t colaMsgTx;
 extern event_source_t newMsgTx_source;
+extern event_source_t newMsgRx_source;
+
 extern struct queu_t colaMsgRx;
 
 extern struct msgRx_t ultMsg;
 
 event_source_t sensor_source;
-uint8_t estadoDeseado;
+extern event_source_t newMsgRx_source;
+
+uint8_t estadoDeseadoSensor;
 
 extern uint16_t modoRadio;
 extern uint16_t sOlvido;
@@ -57,7 +61,10 @@ static const SPIConfig spicfgRF95 = {
     .cr2              = 0U
 };
 
-thread_t *procesoLlamador;
+thread_t *procesoLlamador = NULL;
+thread_t *procesoSensor = NULL;
+
+
 extern "C"
 {
     void llamadorInit(void);
@@ -116,6 +123,8 @@ llamador::llamador(void)
     estadoComms = 0;
     estadoAbusones = 0;
     estadoAbusonesOld = 0;
+    cntTx = 0;
+    cntRx = 0;
 }
 
 
@@ -140,15 +149,17 @@ void llamador::enviaStatusLlamacion(void)
     msgTx.numBytes = 3;
     msgTx.msg[0] = MSG_STATUSLLAMACIONLOCAL;
     msgTx.msg[1] = idLlamador;    //idLlamadorValor();
-    if (bombaPozoSolicitada) // peticion activacion?
+    if (estadoDeseado) // peticion activacion?
         msgTx.msg[2] = '1';
     else
         msgTx.msg[2] = '0';
-    //putQueu(&colaMsgTx, &msgTx);
-    //chEvtBroadcast(&newMsgTx_source);
-    RH_RF95_send(msgTx.msg,msgTx.numBytes);
-    RHGenericDriver_waitPacketSent(100);
-    RH_RF95_setModeRx();
+    putQueu(&colaMsgTx, &msgTx);
+    chEvtBroadcast(&newMsgTx_source);
+    if (++cntTx>99)
+        cntTx = 0;
+//    RH_RF95_send(msgTx.msg,msgTx.numBytes);
+//    RHGenericDriver_waitPacketSent(100);
+//    RH_RF95_setModeRx();
     calendar::getFechaHora(&dateTimeEnvioAnterior);
 }
 
@@ -160,6 +171,11 @@ void llamador::trataObsoletoLlamador(void)
     if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
     {
         numEstadoComOk = 0;
+    }
+    // habiamos enviado el estado deseado a pozo?
+    if (estadoDeseado != bombaPozoSolicitada)
+    {
+        update(estadoDeseado);
     }
     // tengo que refrescar datos al pozo?
     if (calendar::dsDiff(&dateTimeEnvioAnterior) > dsAleatorioMaxEntreMsgsLlamador)
@@ -218,11 +234,15 @@ void llamador::trataRx(struct msgRx_t *msgRx)
 {
     uint8_t msgId = msgRx->msg[0];
     uint8_t estProblematica;
-    uint16_t numBytes;
-    uint8_t bufError[25];
     char buffer[40];
+    uint8_t bufError[10];
     struct tm fechHora;
-    // Formato del mensaje:
+
+    static uint8_t estBomba;
+
+    if (++cntRx>99)
+        cntRx = 0;
+// Formato del mensaje:
     //    Byte 0: MSG_STATUSPOZO
     //    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
     //    Byte 2: Estado bomba del Pozo '0' '1'
@@ -232,6 +252,9 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     {
         uint8_t numEstMsg = msgRx->msg[1];
         uint8_t petBombaMsg = msgRx->msg[2]-'0';
+
+        estBomba = petBombaMsg;
+
         uint8_t estadoActivosMsg = msgRx->msg[3];
         uint8_t estadoLlamacionesMsg = msgRx->msg[4];
         calendar::getFechaHora(&dateTimeRxPozoAnterior);
@@ -241,9 +264,9 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             gestionaEstadoPozo(petBombaMsg, estadoLlamacionesMsg, estadoActivosMsg);
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Msg pozo. Bomba:%d RSSI:%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, petBombaMsg, msgRx->rssi);
-            uint8_t varNext = numEstMsg;
-            if (varNext>6) varNext=6;
+            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg pozo Bomba:%d RSSI:%d\n", fechHora.tm_min, fechHora.tm_sec, petBombaMsg, msgRx->rssi);
+         //   chLcdprintfFila(0,buffer);
+            chprintf((BaseSequentialStream*)&SD1,buffer);
         }
     }
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
@@ -255,14 +278,14 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         {
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Msg de #%d. Llamacion:%d RSSI:%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, numEstMsg,petBombaMsg, msgRx->rssi);
+            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg de #%d Llamacion:%d RSSI:%d\n",fechHora.tm_min, fechHora.tm_sec, numEstMsg,petBombaMsg, msgRx->rssi);
+         //   chLcdprintfFila(0,buffer);
+            chprintf((BaseSequentialStream*)&SD1,buffer);
 //            enviaTxtSiEnPage(idPageLog,idNombreLog, buffer);
-            uint8_t varNext = numEstMsg;
-            if (varNext>6) varNext=6;
         }
     }
     // Tipo de Mensaje MSG_ERROR. Longitud=variable, de 4 a un maximo de 24 bytes
-    // Este mensaje es un beacon que se envia desde el satelite, indicando errores
+    // Este mensaje es un beacon que se envia desde el satelite, indicando extern volatile int16_t _lastRssi;
     //
     // Formato del mensaje:
     //    Byte 0: MSG_ERROR
@@ -280,7 +303,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         uint8_t estadoAbusonesOld = estadoAbusones;
         estProblematica = msgRx->msg[3];
         estadoAbusones |= (1<<(estProblematica-1));
-        numBytes = msgRx->msg[4];
+        uint8_t numBytes = msgRx->msg[4];
         if (numBytes>sizeof(bufError))
             numBytes = sizeof(bufError);
         memcpy(bufError, &msgRx->msg[5],numBytes);
@@ -290,7 +313,9 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Abusa #%d msg:'%s'",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec,estProblematica,bufError);
+            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Abusa #%d msg:'%s'\n",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec,estProblematica,bufError);
+            chprintf((BaseSequentialStream*)&SD1,buffer);
+          //  chLcdprintfFila(0,buffer);
         }
     }
     // Tipo de Mensaje MSG_CLEARERROR. Longitud=4
@@ -316,37 +341,34 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Deja de abusar #%d",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, estProblematica);
+            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Deja de abusar #%d\n",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, estProblematica);
+            chprintf((BaseSequentialStream*)&SD1,buffer);
+            //chLcdprintfFila(0,buffer);
             //enviaTxt(idPageLog,idNombreLog, buffer);
         }
     }
 }
 
-void llamador::trataRxRf95(eventmask_t evt)
+void llamador::trataRxRf95(eventmask_t )
 {
-    struct msgRx_t msgRx;
-    struct msgTx_t msgTx;
-    if (evt==0) // timeout, llamo a rutinas
-    {
-        trataObsoletoLlamador();
-    }
-    if (evt & EVENT_MASK(0)) // He recibido un mensaje rf95
-    {
-        while (getQueu(&colaMsgRx, &msgRx))
-        {
-            if (++cnt>99) cnt=0;
-            trataRx(&msgRx);
-        }
-    }
-    if (evt & EVENT_MASK(1)) // Tengo que enviar mensajes rf95
-    {
-        while (getQueu(&colaMsgTx, &msgTx))
-        {
-            RH_RF95_send(msgTx.msg,msgTx.numBytes);
-            RHGenericDriver_waitPacketSent(100);
-            RH_RF95_setModeRx();
-        }
-    }
+//    if (evt == 0)  // timeout
+//    {
+//        trataObsoletoLlamador();
+//        return;
+//    }
+//    if (evt == EVENT_MASK(0))  // ha cambiado el sensor, enviamos a cola de transmision
+//    {
+//        chLcdprintfFila(3,"%d llamador envio %d",cntTx,estadoDeseado);
+//        enviaStatusLlamacion();
+//    }
+//    if (evt == EVENT_MASK(1))  // he recibido un mensaje que esta en la cola
+//    {
+//        while (getQueu(&colaMsgRx, &msgRx))
+//        {
+//            chLcdprintfFila(1,"%d recibo msg",cntRx);
+//            trataRx(&msgRx);
+//        }
+//    }
 }
 
 
@@ -379,8 +401,9 @@ void llamador::stop(void)
     paraRadio();
 }
 
-void llamador::update(uint8_t estadoDeseado)
+void llamador::update(uint8_t estadoDeseadoPar)
 {
+    estadoDeseado = estadoDeseadoPar;
     if (estadoDeseado != bombaPozoSolicitada)
     {
         if (calendar::dsDiff(&dateTimeEnvioAnterior)>(uint32_t)dsAleatorioMinEntreMsgsLlamador)
@@ -392,67 +415,84 @@ void llamador::update(uint8_t estadoDeseado)
     }
 }
 
-void cb_sensor(void *)
-{
-    estadoDeseado = !palReadLine(LINE_SENSOR);
-    if (estadoDeseado)
-        palClearLine(LINE_LED);         // enciende
-    else
-        palSetLine(LINE_LED);           // apagado
-    chSysLockFromISR();
-    chEvtBroadcastI(&sensor_source);
-    chSysUnlockFromISR();
-}
-
-void initSensor(void)
-{
-    estadoDeseado = !palReadLine(LINE_SENSOR);
-    if (estadoDeseado)
-        palClearLine(LINE_LED);         // enciende
-    else
-        palSetLine(LINE_LED);           // apagado
-    palSetLineMode(LINE_SENSOR, PAL_MODE_INPUT);
-    palEnableLineEvent(LINE_SENSOR, PAL_EVENT_MODE_BOTH_EDGES);     // Falling edge creates event
-    palSetLineCallback(LINE_SENSOR, cb_sensor, NULL); // Active callback
-}
-
-
 llamador *llamadorObj;
+
+
+/*
+ * Gestor sensor
+ * Comprueba estado que dure mas de 500ms y notifica cambio
+ */
+static THD_WORKING_AREA(waThreadSensor, 256);
+static THD_FUNCTION(ThreadSensor, arg) {
+    (void)arg;
+    uint16_t msNuevoEstado;
+    uint8_t nuevoEstado;
+    chRegSetThreadName("sensor");
+    nuevoEstado = !palReadLine(LINE_SENSOR);
+    msNuevoEstado = 0;
+    while(!chThdShouldTerminateX()) {
+        nuevoEstado = !palReadLine(LINE_SENSOR);
+        if (nuevoEstado != estadoDeseadoSensor)
+        {
+            msNuevoEstado += 100;
+            if (msNuevoEstado > 500)
+            {
+                estadoDeseadoSensor = nuevoEstado;
+                msNuevoEstado = 0;
+                chEvtBroadcast(&sensor_source);
+            }
+        }
+        else
+            msNuevoEstado = 0;
+        chThdSleepMilliseconds(100);
+    }
+}
+
+
 /*
  * Gestor llamacion
+ * Espero cambios en sensor (para enviar estado) y trato mensajes recibidos
  */
-static THD_WORKING_AREA(waThreadLlamador, 1024);
+static THD_WORKING_AREA(waThreadLlamador, 2000);
 static THD_FUNCTION(ThreadLlamador, arg) {
-  (void)arg;
-  uint16_t dsTimeOut = 50;
-  event_listener_t el0;
-  chRegSetThreadName("llamador");
-  llamadorObj = new llamador();
-  llamadorObj->init();
-  chEvtRegister(&sensor_source, &el0, 0);
-  while(!chThdShouldTerminateX()) {
-    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
-    if (chThdShouldTerminateX())
-        chThdExit((msg_t) 1);
-    dsTimeOut--;
-    if (evt == 0 && dsTimeOut>0)  // timeout
-        continue;
-    if (dsTimeOut>0)
-        chLcdprintfFila(3,"Envio estado %d",estadoDeseado);
-    else
-        chLcdprintfFila(3,"Reenvio estado %d",estadoDeseado);
-    dsTimeOut = 50;
-    llamadorObj->update(estadoDeseado);
-   }
+    (void)arg;
+    struct msgRx_t msgRx;
+    event_listener_t el0, el1;
+    chRegSetThreadName("llamador");
+    llamadorObj = new llamador();
+    llamadorObj->init();
+    chEvtRegister(&sensor_source, &el0, 1);
+    chEvtRegister(&newMsgRx_source, &el1, 2);
+    while(!chThdShouldTerminateX()) {
+        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
+        if (chThdShouldTerminateX())
+            chThdExit((msg_t) 1);
+        if (evt == 0)  // timeout
+        {
+            llamadorObj->trataObsoletoLlamador();
+            continue;
+        }
+        if (evt == EVENT_MASK(1))  // ha cambiado el sensor, enviamos a cola de transmision
+        {
+            llamadorObj->update(estadoDeseadoSensor); //enviaStatusLlamacion();
+            continue;
+        }
+        if (evt == EVENT_MASK(2))  // he recibido un mensaje que esta en la cola
+        {
+            while (getQueu(&colaMsgRx, &msgRx))
+            {
+                llamadorObj->trataRx(&msgRx);
+            }
+        }
+    }
 }
 
 
 void llamadorInit(void)
 {
-    llamadorObj = new llamador();
-    llamadorObj->init();
     if (!procesoLlamador)
         procesoLlamador = chThdCreateStatic(waThreadLlamador, sizeof(waThreadLlamador), NORMALPRIO + 7,  ThreadLlamador, NULL);
-    initSensor();
+    if (!procesoSensor)
+        procesoSensor = chThdCreateStatic(waThreadSensor, sizeof(waThreadSensor), NORMALPRIO + 7,  ThreadSensor, NULL);
 }
 

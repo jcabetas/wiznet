@@ -94,6 +94,7 @@ protected:
     uint16_t dsAleatorioMaxEntreMsgsLlamador;
     struct fechaHora dateTimeEnvioAnterior;
     struct fechaHora dateTimeRxPozoAnterior;
+    uint8_t cntTx, cntRx;
 public:
     llamador(void);
     ~llamador();

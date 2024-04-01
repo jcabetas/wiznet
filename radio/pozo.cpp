@@ -51,6 +51,9 @@ extern uint16_t tiempoAbuso;         // minutos
 extern uint16_t dsMaxEntreMsgsPozo;
 extern uint16_t dsMinEntreMsgsPozo;
 
+pozo *pozoObj;
+
+
 /*
  * Envia MSG_STATUSPOZO
     //    Byte 0: MSG_STATUSPOZO
@@ -391,7 +394,6 @@ void pozo::stop(void)
     paraRadio();
 }
 
-pozo *pozoObj;
 void pozoInit(void)
 {
     pozoObj = new pozo();
