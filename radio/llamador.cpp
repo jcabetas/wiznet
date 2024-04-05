@@ -24,6 +24,9 @@ using namespace chibios_rt;
 
 #include <stdlib.h>
 
+
+
+
 //uint32_t msEntreFechas(RTCDateTime *fechaNew, RTCDateTime *fechaOld);
 //time_t GetTimeUnixSec(void);
 int32_t randomNum(int32_t numMin, int32_t numMax);
@@ -163,6 +166,16 @@ void llamador::enviaStatusLlamacion(void)
     calendar::getFechaHora(&dateTimeEnvioAnterior);
 }
 
+uint8_t llamador::getCntTx(void)
+{
+    return cntTx;
+}
+
+uint8_t llamador::getCntRx(void)
+{
+    return cntRx;
+}
+
 
 
 void llamador::trataObsoletoLlamador(void)
@@ -237,9 +250,6 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     char buffer[40];
     uint8_t bufError[10];
     struct tm fechHora;
-
-    static uint8_t estBomba;
-
     if (++cntRx>99)
         cntRx = 0;
 // Formato del mensaje:
@@ -252,9 +262,6 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     {
         uint8_t numEstMsg = msgRx->msg[1];
         uint8_t petBombaMsg = msgRx->msg[2]-'0';
-
-        estBomba = petBombaMsg;
-
         uint8_t estadoActivosMsg = msgRx->msg[3];
         uint8_t estadoLlamacionesMsg = msgRx->msg[4];
         calendar::getFechaHora(&dateTimeRxPozoAnterior);
@@ -264,9 +271,9 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             gestionaEstadoPozo(petBombaMsg, estadoLlamacionesMsg, estadoActivosMsg);
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg pozo Bomba:%d RSSI:%d\n", fechHora.tm_min, fechHora.tm_sec, petBombaMsg, msgRx->rssi);
-         //   chLcdprintfFila(0,buffer);
-            chprintf((BaseSequentialStream*)&SD1,buffer);
+            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
+            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
+            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
         }
     }
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
@@ -278,10 +285,10 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         {
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg de #%d Llamacion:%d RSSI:%d\n",fechHora.tm_min, fechHora.tm_sec, numEstMsg,petBombaMsg, msgRx->rssi);
-         //   chLcdprintfFila(0,buffer);
-            chprintf((BaseSequentialStream*)&SD1,buffer);
-//            enviaTxtSiEnPage(idPageLog,idNombreLog, buffer);
+            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
+            chLcdprintfFila(0,buffer);
+            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
+            chLcdprintfFila(1,buffer);
         }
     }
     // Tipo de Mensaje MSG_ERROR. Longitud=variable, de 4 a un maximo de 24 bytes
@@ -313,9 +320,8 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Abusa #%d msg:'%s'\n",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec,estProblematica,bufError);
-            chprintf((BaseSequentialStream*)&SD1,buffer);
-          //  chLcdprintfFila(0,buffer);
+            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
+            chLcdprintfFila(1,"msg:'%s'",bufError);
         }
     }
     // Tipo de Mensaje MSG_CLEARERROR. Longitud=4
@@ -341,10 +347,8 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%2d:%02d:%02d Deja de abusar #%d\n",fechHora.tm_hour, fechHora.tm_min, fechHora.tm_sec, estProblematica);
-            chprintf((BaseSequentialStream*)&SD1,buffer);
-            //chLcdprintfFila(0,buffer);
-            //enviaTxt(idPageLog,idNombreLog, buffer);
+            chLcdprintfFila(0,"%02d:%02d Deja de abusar #%d", fechHora.tm_min, fechHora.tm_sec, estProblematica);
+            chLcdprintfFila(1,"");
         }
     }
 }

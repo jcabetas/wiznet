@@ -30,9 +30,7 @@ extern event_source_t newMsgTx_source;
 extern uint8_t cnt;
 //extern varMODOPOZO modopozo;
 //extern uint8_t checkTrataMsgRf95;
-
-
-extern event_source_t rf95int_event;
+extern event_source_t rf95int_source;
 
 
 void initRF95(void);

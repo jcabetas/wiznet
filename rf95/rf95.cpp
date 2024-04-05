@@ -41,23 +41,13 @@ extern event_source_t newMsgRx_source;
 extern event_source_t newMsgTx_source;
 thread_t *procesoRf95Int, *procesoRf95rx;
 
-extern volatile int16_t _lastRssi;
-extern volatile uint8_t _bufLen;
-extern uint8_t _buf[RH_RF95_MAX_PAYLOAD_LEN];
 
 extern uint16_t modoRadio;
 extern llamador *llamadorObj;
 extern pozo *pozoObj;
 
 
-//extern volatile uint8_t _bufLen;
-//extern uint8_t _buf[RH_RF95_MAX_PAYLOAD_LEN];
-//
-//extern uint16_t modoRadio;
-//extern llamador *llamadorObj;
-//extern pozo *pozoObj;errores
-
-//extern uint8_t checkRf95int;
+RH_RF95 rf95;
 
 
 time_t GetTimeUnixSec(void);
@@ -71,85 +61,58 @@ extern struct queu_t colaMsgRx, colaMsgTx;
  * Interrupciones rf95. Activa proceso rf95int para leer datos
  */
 static void f2_cb(void *arg) {
-  (void)arg;
-  uint8_t estDIO0 = palReadLine(LINE_DIO0);
-  chSysLockFromISR();
-  // activa gestor interrupciones
-  chEvtBroadcastI(&rf95int_source);
-  chSysUnlockFromISR();
+    (void)arg;
+    chSysLockFromISR();
+    chEvtBroadcastI(&rf95int_source);   //para que procese la interrupcion
+    chSysUnlockFromISR();
 }
 
 
+void procesaRx(void)
+{
+    struct msgRx_t msgRx;
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t bufLen = sizeof(buf);
+    if (rf95.recv(buf, &bufLen))
+    {
+        uint8_t size = bufLen;
+        if (size>sizeof(msgRx.msg))
+          size = sizeof(msgRx.msg);
+        msgRx.timet = calendar::getSecUnix();
+        msgRx.numBytes = size;
+        msgRx.rssi = rf95._lastRssi;
+        memcpy(msgRx.msg, buf, size);
+        putQueu(&colaMsgRx, &msgRx);
+        bufLen = 0;
+        chEvtBroadcast(&newMsgRx_source);
+    }
+}
 
-///*
-// * rf95int thread.
-// * gestiona interrupciones
-// * lee datos de rf95 y los almacena en cola de mensajes
-// */
-//static THD_WORKING_AREA(rf95int_wa, 2000);
-//static THD_FUNCTION(rf95int, p) {
-//  (void)p;
-//  event_listener_t el0;
-//  paquete_t tipoPaq;
-//  struct msgRx_t msgRx;
-//  chRegSetThreadName("rf95int");
-//  chEvtRegister(&rf95int_event, &el0, 0);
-//  while(!chThdShouldTerminateX()) {
-//    eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
-////    checkRf95int = 1;
-//    if (chThdShouldTerminateX())
-//        chThdExit((msg_t) 1);
-//    if (evt == 0)  // timeout
-//        continue;
-//    RH_RF95_send(msgTx.msg,msgTx.numBytes);
-//    RHGenericDriver_waitPacketSent(100);
-//    RH_RF95_setModeRx();
-//
-//    tipoPaq = RH_RF95_handleInterrupt();
-//    RH_RF95_setModeRx();
-//    if (tipoPaq==paqRx)
-//    {
-//        uint8_t size = _bufLen-4;
-//        if (size>sizeof(msgRx.msg))
-//            size = sizeof(msgRx.msg);
-//        msgRx.timet = calendar::getSecUnix();
-//        msgRx.numBytes = size;
-//        msgRx.rssi = _lastRssi;
-//        memcpy(msgRx.msg, &_buf[4], size);
-//        putQueu(&colaMsgRx, &msgRx);
-//        chEvtBroadcast(&newMsgRx_source);
-//        _bufLen = 0;
-//    }
-//  }
-//  chEvtUnregister(&rf95int_event, &el0);
-//  procesoRf95rx = NULL;
-//}
 
 /*
- * Trata mensajes recibidos por rf95     (en la colaRx)
- * Envia mensajes que pidan ser enviados (en la colaTx)
- * Llama cada segundo a rutinas para vigilar cambios
+ * Si hay una interrupcion de rf95, la proceso. Si es mensaje recibido, lo lee y guarda en cola
+ * Si hay que enviar algo, lee de la cola y envia
  */
 static THD_WORKING_AREA(trataRf95_wa,2000);
 static THD_FUNCTION(trataRf95, p) {
     (void)p;
-    struct msgRx_t msgRx;
+
     struct msgTx_t msgTx;
     event_listener_t newMsgTx_lis, rf95int_lis;
-    paquete_t tipoPaq;
+
 
     chRegSetThreadName("trataRf95");
     chEvtRegister(&rf95int_source, &rf95int_lis, 1);
     chEvtRegister(&newMsgTx_source, &newMsgTx_lis, 2);
-    RH_RF95_setModeRx();
-    //    msMaxEntreMsgsLlamador = randomNum(100*dsMaxEntreMsgsLlamadorValor()-2000,100*dsMaxEntreMsgsLlamadorValor());
-//    chEvtRegister(&newMsgRx_source, &newMsgRx_lis, EVENT_MASK(0));  //
     do {
-        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(1000));
+        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(50));
         if (chThdShouldTerminateX())
             chThdExit((msg_t) 1);
         if (evt==0) // timeout, llamo a rutinas
         {
+            // hemos recibido algo ? (por si las moscas)
+            if (rf95.available())
+                procesaRx();
             switch (modoRadio)
             {
             case 1:
@@ -161,41 +124,27 @@ static THD_FUNCTION(trataRf95, p) {
                     pozoObj->trataObsoletoPozo();
                 break;
             }
+            chLcdprintfFila(3,"");
             continue;
         }
-        if (evt==EVENT_MASK(1)) // hay una interrupcion, vamos a ver si he recibido algo por radio
+        if (evt==EVENT_MASK(1)) // hay una interrupcion de rf95, la procesamos
         {
-            uint8_t estDIO0 = palReadLine(LINE_DIO0);
-            tipoPaq = RH_RF95_handleInterrupt();
-            uint8_t estDIO01 = palReadLine(LINE_DIO0);
-            RH_RF95_setModeRx();
-            uint8_t estDIO02 = palReadLine(LINE_DIO0);
-            if (tipoPaq==paqRx)    // hemos recibido un mensaje, lo enviamos a la cola de recepcion
-            {
-                uint8_t size = _bufLen-4;
-                if (size>sizeof(msgRx.msg))
-                    size = sizeof(msgRx.msg);
-                msgRx.timet = calendar::getSecUnix();
-                msgRx.numBytes = size;
-                msgRx.rssi = _lastRssi;
-                memcpy(msgRx.msg, &_buf[4], size);
-                putQueu(&colaMsgRx, &msgRx);
-                chEvtBroadcast(&newMsgRx_source);
-                chLcdprintfFila(2,"en rf95 msg de %d",msgRx.msg[1]);
-                _bufLen = 0;
-            }
-            continue;
+            rf95.handleInterrupt();
+            if (rf95.available()) // nuevo, cambia a recepcion de cualquier forma
+               procesaRx();
         }
         if (evt == EVENT_MASK(2)) // Tengo que enviar mensajes rf95, en colaMsgTx
         {
-            while (getQueu(&colaMsgTx, &msgTx))
+            if(getQueu(&colaMsgTx, &msgTx))
             {
-                RH_RF95_send(msgTx.msg,msgTx.numBytes);
-                RHGenericDriver_waitPacketSent(100);
-                RH_RF95_setModeRx();
-                chLcdprintfFila(2,"en rf95 envio msg");
+                rf95.send(msgTx.msg,msgTx.numBytes);
+                //bool finNormal = rf95.waitPacketSent(5000);
+               // RH_RF95_setModeRx();
+//                if (finNormal)
+//                    chLcdprintfFila(3,"Enviado msg!!");
+//                else
+//                    chLcdprintfFila(3,"Timeout enviando");
             }
-            continue;
         }
     } while (1==1);
 }
@@ -231,7 +180,7 @@ void initRF95(void)
     palSetLineMode(LINE_DIO0, PAL_MODE_INPUT);
     palEnableLineEvent(LINE_DIO0, PAL_EVENT_MODE_RISING_EDGE);
     palSetLineCallback(LINE_DIO0, f2_cb, NULL);
-    if (!RH_RF95_init())
+    if (!rf95.init())
     {
         chLcdprintfFila(3,"RF95init failed!!");
         osalThreadSleepMilliseconds(2000);
@@ -239,8 +188,7 @@ void initRF95(void)
         palDisableLineEvent(LINE_DIO0);
         return;
     }
-    RH_RF95_setFrequency(434.0f);
-    RH_RF95_setModeRx();
+    rf95.setFrequency(434.0f);
     if (!procesoRf95Int)
         procesoRf95Int = chThdCreateStatic(trataRf95_wa, sizeof(trataRf95_wa), NORMALPRIO + 7,  trataRf95, NULL);
     chLcdprintfFila(3,"RF95 a 434.0MHz");

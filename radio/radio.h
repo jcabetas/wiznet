@@ -105,6 +105,8 @@ public:
     void stop(void);
     void print(BaseSequentialStream *tty);
     void update(uint8_t estadoDeseado);
+    uint8_t getCntTx(void);
+    uint8_t getCntRx(void);
     const char *diTipo(void);
     // objeto "radio" propiamente dicho
     // pozoComun:

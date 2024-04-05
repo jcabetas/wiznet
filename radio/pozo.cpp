@@ -361,9 +361,9 @@ void pozo::trataRxRf95(eventmask_t evt)
     {
         while (getQueu(&colaMsgTx, &msgTx))
         {
-            RH_RF95_send(msgTx.msg,msgTx.numBytes);
-            RHGenericDriver_waitPacketSent(100);
-            RH_RF95_setModeRx();
+//            pozoObj->send(msgTx.msg,msgTx.numBytes);
+//            pozoObj->waitPacketSent(100);
+//            pozoObj->setModeRx();
         }
     }
 }

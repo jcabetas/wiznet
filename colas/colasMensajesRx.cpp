@@ -9,7 +9,7 @@
 #include "colas.h"
 #include "string.h"
 
-#define NUMMSGRXENCOLA  3
+#define NUMMSGRXENCOLA  5
 
 mutex_t MtxMsgRx;
 
