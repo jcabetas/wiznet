@@ -130,24 +130,18 @@ LDSCRIPT= $(STARTUPLD)/STM32F411xE.ld
 CSRC = $(ALLCSRC) \
        $(CHIBIOS)/os/various/evtimer.c \
        main.c 
-       #  MPU6050/i2cdev_chibi.c 
-       # $(CHIBIOS)MPU6050/i2cdev_chibi.c $(CHIBIOS)MPU6050/mpu6050.c \
-       #       $(CHIBIOS)/os/various/syscalls.c \
-       #       $(CONFDIR)/portab.c usbcfg.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CPPSRC = $(ALLCPPSRC) \
          w25q16/w25q16.cpp variables/varsGestion.cpp variables/volcarFlash.cpp variables/variables.cpp version.cpp \
 		 rf95/RH_RF95.cpp rf95/rf95.cpp \
+         radio/llamador.cpp radio/pozo.cpp radio/radio.cpp \
          calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
          serial.cpp tty/gets.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp \
-         radio/pozoComun.cpp radio/tratamientoMsgRF95.cpp radio/llamador.cpp radio/pozo.cpp radio/radio.cpp\
          colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp \
-         modbus/modbus.cpp modbus/sdm120ct.cpp modbus/crc.cpp modbus/dispositivos.cpp
+         modbus/modbus.cpp modbus/sdm120ct.cpp modbus/vacon.cpp modbus/crc.cpp modbus/dispositivos.cpp
 
-         #rf95/rf95.cpp rf95/RH_RF95.cpp \
-         
 
 #         usbSource/serialUSB.cpp w25q16/varsFlash.cpp
 

@@ -22,11 +22,7 @@
 
 extern event_source_t updateLCD_source;
 extern event_source_t sensor_source;
-extern uint16_t modoRadio;
 
-extern event_source_t enviaLlamacionMsg_source;
-extern event_source_t enviaPozoMsg_source;
-extern event_source_t registraMsgPozo_source;
 extern event_source_t rf95int_source;
 extern event_source_t newMsgRx_source;
 extern event_source_t newMsgTx_source;
@@ -38,6 +34,7 @@ void initHM10(void);
 void llamadorInit(void);
 void pozoInit(void);
 void testMB(void);
+void arrancaRadioC(void);
 
 void leeVariablesC(void);
 void ponEnLCDC(uint8_t fila, char const msg[]);
@@ -94,14 +91,9 @@ int main(void) {
   chSysInit();
 
   chEvtObjectInit(&sensor_source);
-  chEvtObjectInit(&enviaLlamacionMsg_source);
-  chEvtObjectInit(&enviaPozoMsg_source);
-  chEvtObjectInit(&registraMsgPozo_source);
-
   chEvtObjectInit(&rf95int_source);
   chEvtObjectInit(&newMsgRx_source);
   chEvtObjectInit(&newMsgTx_source);
-
   chEvtObjectInit(&updateLCD_source);
 
   initColas();
@@ -113,11 +105,7 @@ int main(void) {
   chLcdprintfFilaC(3,"Leido variables");
   chThdSleepMilliseconds(100);
   initHM10();
-  modoRadio = 1;
-  if (modoRadio==1)
-      llamadorInit();
-  if (modoRadio==2)
-      pozoInit();
+  arrancaRadioC();
   //testMB();
   while (true) {
       chThdSleepMilliseconds(50);

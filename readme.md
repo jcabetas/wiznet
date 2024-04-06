@@ -17,3 +17,14 @@ ChibiOS/RT port for ARM-Cortex-M4 STM32F411.
 -  En modbus, el pin 6 es "A" y debería tener pull-up hacia 3,3V (ahora esta en pull-down), idem pin 7 "B"
 -  El SN651768 se alimenta a 5V, no a 3,3V
 -  Cambiandolo a SN65HVD7X no hace falta pullup ni pulldown (que reduce numero de dispositivos), ver [Articulo 1 Signetics](https://www.ti.com/lit/an/slyt514/slyt514.pdf?ts=1709631755825&ref_url=https%253A%252F%252Fwww.google.com%252F) y [Articulo 2](https://www.ti.com/lit/ds/symlink/sn65hvd78.pdf?ts=1709647071754&ref_url=https%253A%252F%252Fwww.google.com%252F)
+
+## Tratamiento de radio
+Proceso **trataRf95**:
+   * Si hay una interrupcion de rf95, la gestiona (no quiero leer de SPI en la propia interrupcion)
+   * Envia los mensajes que esten en cola de transmision
+   * Si se ha recibido un mensaje, lo coloca en cola de recepcion
+   
+Clases registrador/llamador/pozo:  
+   * Deben derivarse de radio.h, e implementar funciones virtuales "init", "stop", "trataRx"
+   * Pueden enviar mensajes en cualquier momento por la colaTx/eventos
+   * Se crea en el arranque, según la opción de variables

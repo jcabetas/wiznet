@@ -16,8 +16,6 @@ using namespace chibios_rt;
 #include <stdio.h>
 #include "colas.h"
 #include "RH_RF95.h"
-//#include "../radio/pozo.h"
-//#include "tipoVars.h"
 #include "radio.h"
 #include "calendarUTC.h"
 #include "lcd.h"
@@ -50,19 +48,6 @@ extern uint16_t idLlamador;
 extern uint16_t dsMaxEntreMsgsLlamador;
 extern uint16_t dsMinEntreMsgsLlamador;
 
-//extern event_source_t hayRxParaLCD_source;
-//extern event_source_t hayCambiosLCD_source;
-
-static const SPIConfig spicfgRF95 = {
-    .circular         = false,
-    .slave            = false,
-    .data_cb          = NULL,
-    .error_cb         = NULL,
-    .ssport           = GPIOB,
-    .sspad            = GPIOB_NSS,
-    .cr1              = SPI_CR1_BR_1 | SPI_CR1_BR_0,
-    .cr2              = 0U
-};
 
 thread_t *procesoLlamador = NULL;
 thread_t *procesoSensor = NULL;
@@ -82,36 +67,6 @@ int32_t randomNum(int32_t numMin, int32_t numMax)
    return numMin + (rand() %(numMax-numMin));
 }
 
-//uint8_t estadoBombaRequeridobah(void)
-//{
-//    //return palReadPad(GPIOE, 0);
-//    estados::diEstado(numInput);
-//    return peticionAgua.getValorNum();
-//}
-
-/*
- *   Los cambios se detectan por los mensajes del pozo
- *   Si hay cambios en estados, graba en SD y resetea
- */
-/*
- *     uint16_t numInput;
-    uint8_t bombaPozoOn;
-    int32_t msAleatorioMinEntreMsgsLllamador;
-    int32_t msAleatorioMaxEntreMsgsLllamador;
-    RTCDateTime dateTimeEnvioAnterior;
-    time_t timeUltConexion[NUMSATELITES];
-    // tratamiento de errores de Jandro
-    uint8_t numErrorAviso[MAXERRORESAVISO];
-    uint8_t idEstacionAviso[MAXERRORESAVISO];
-    uint8_t mensajeAviso[MAXERRORESAVISO][21];
-    time_t timeInicioAvisoError[MAXERRORESAVISO];
-    parametroU16Flash *idLlamador;
-    parametroU16Flash *dsMaxEntreMsgsLlamador;
-    parametroU16Flash *dsMinEntreMsgsLlamador;
-
-    TODO: poner TimeOut para comunicacion con pozo sOlv
-
- */
 // LLAMADOR zona3 [idLlam 1] [dsMin 5] [dsMax 100] [sOlvido 30] pozo.logPozo.txt bOn.radio.pic.0 comOk.radio.pic.0 llam.radio.txt act.radio.txt abu.radio.txt
 llamador::llamador(void)
 {
@@ -160,25 +115,12 @@ void llamador::enviaStatusLlamacion(void)
     chEvtBroadcast(&newMsgTx_source);
     if (++cntTx>99)
         cntTx = 0;
-//    RH_RF95_send(msgTx.msg,msgTx.numBytes);
-//    RHGenericDriver_waitPacketSent(100);
-//    RH_RF95_setModeRx();
     calendar::getFechaHora(&dateTimeEnvioAnterior);
 }
 
-uint8_t llamador::getCntTx(void)
-{
-    return cntTx;
-}
-
-uint8_t llamador::getCntRx(void)
-{
-    return cntRx;
-}
 
 
-
-void llamador::trataObsoletoLlamador(void)
+void llamador::trataObsoleto(void)
 {
     // ha pasado mucho tiempo sin recibir?
     if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
@@ -353,29 +295,6 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     }
 }
 
-void llamador::trataRxRf95(eventmask_t )
-{
-//    if (evt == 0)  // timeout
-//    {
-//        trataObsoletoLlamador();
-//        return;
-//    }
-//    if (evt == EVENT_MASK(0))  // ha cambiado el sensor, enviamos a cola de transmision
-//    {
-//        chLcdprintfFila(3,"%d llamador envio %d",cntTx,estadoDeseado);
-//        enviaStatusLlamacion();
-//    }
-//    if (evt == EVENT_MASK(1))  // he recibido un mensaje que esta en la cola
-//    {
-//        while (getQueu(&colaMsgRx, &msgRx))
-//        {
-//            chLcdprintfFila(1,"%d recibo msg",cntRx);
-//            trataRx(&msgRx);
-//        }
-//    }
-}
-
-
 
 llamador::~llamador()
 {
@@ -392,13 +311,6 @@ const char *llamador::diNombre(void)
     return "LLAMADOR";
 }
 
-
-int8_t llamador::init(void)
-{
-    arrancaRadio();
-    calendar::getFechaHora(&dateTimeRxPozoAnterior);
-    return 0;
-}
 
 void llamador::stop(void)
 {
@@ -418,9 +330,6 @@ void llamador::update(uint8_t estadoDeseadoPar)
         }
     }
 }
-
-llamador *llamadorObj;
-
 
 /*
  * Gestor sensor
@@ -463,8 +372,6 @@ static THD_FUNCTION(ThreadLlamador, arg) {
     struct msgRx_t msgRx;
     event_listener_t el0, el1;
     chRegSetThreadName("llamador");
-    llamadorObj = new llamador();
-    llamadorObj->init();
     chEvtRegister(&sensor_source, &el0, 1);
     chEvtRegister(&newMsgRx_source, &el1, 2);
     while(!chThdShouldTerminateX()) {
@@ -473,30 +380,33 @@ static THD_FUNCTION(ThreadLlamador, arg) {
             chThdExit((msg_t) 1);
         if (evt == 0)  // timeout
         {
-            llamadorObj->trataObsoletoLlamador();
+            radio::obsoleto();
             continue;
         }
         if (evt == EVENT_MASK(1))  // ha cambiado el sensor, enviamos a cola de transmision
         {
-            llamadorObj->update(estadoDeseadoSensor); //enviaStatusLlamacion();
+            llamador::llamadorPtr->update(estadoDeseadoSensor); //enviaStatusLlamacion();
             continue;
         }
         if (evt == EVENT_MASK(2))  // he recibido un mensaje que esta en la cola
         {
             while (getQueu(&colaMsgRx, &msgRx))
             {
-                llamadorObj->trataRx(&msgRx);
+                llamador::llamadorPtr->trataRx(&msgRx);
             }
         }
     }
 }
 
 
-void llamadorInit(void)
+uint8_t llamador::init(void)
 {
+    modo = Llamador;
+    calendar::getFechaHora(&dateTimeRxPozoAnterior);
     if (!procesoLlamador)
         procesoLlamador = chThdCreateStatic(waThreadLlamador, sizeof(waThreadLlamador), NORMALPRIO + 7,  ThreadLlamador, NULL);
     if (!procesoSensor)
         procesoSensor = chThdCreateStatic(waThreadSensor, sizeof(waThreadSensor), NORMALPRIO + 7,  ThreadSensor, NULL);
+    return 0;
 }
 

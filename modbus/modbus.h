@@ -110,4 +110,32 @@ public:
     void addDs(uint16_t ds);
 };
 
+
+class vacon : public dispositivo
+{
+    // SDM120CT MedidorFlexo 2
+protected:
+    char nombre[15];
+    uint16_t direccion;
+    uint8_t  erroresSeguidos;
+    uint8_t  numMedidas;
+    float *ptrMed[MAXMEDIDAS];
+    uint16_t tipoMed[MAXMEDIDAS];
+    char descrMed[MAXMEDIDAS][NOMBRELENGTH];
+    uint16_t dsUpdateMaxMed[MAXMEDIDAS];
+    uint16_t dsDesdeUpdate[MAXMEDIDAS];
+public:
+    vacon(const char *nombrePar);
+    ~vacon();
+    uint8_t attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t dsUpdatePar, const char *descrPar);
+    void changeID(uint8_t oldId, uint8_t newId, int16_t *error);
+    uint8_t usaBus(void);
+    void leer(float *valor, uint8_t tipMedida, int16_t *error);
+    uint16_t diDir(void);
+    const char *diTipo(void);
+    char *diNombre(void);
+    int8_t init(void);
+    void addDs(uint16_t ds);
+};
+
 #endif /* DISPOSITIVOS_DISPOSITIVOS_H_ */

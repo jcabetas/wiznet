@@ -36,9 +36,11 @@ static const SPIConfig spicfgRF95 = {
     .cr2              = 0U
 };
 
+
+event_source_t newMsgRx_source;
+event_source_t newMsgTx_source;
+
 event_source_t rf95int_source;
-extern event_source_t newMsgRx_source;
-extern event_source_t newMsgTx_source;
 thread_t *procesoRf95Int, *procesoRf95rx;
 
 
@@ -51,8 +53,6 @@ RH_RF95 rf95;
 
 
 time_t GetTimeUnixSec(void);
-uint8_t putQueu(struct queu_t *colaMed, void *ptrStructOrigen);
-uint8_t getQueu(struct queu_t *colaMed, void *ptrStructDestino);
 void ponEnLCD(uint8_t fila, char const msg[]);
 
 extern struct queu_t colaMsgRx, colaMsgTx;
@@ -100,7 +100,6 @@ static THD_FUNCTION(trataRf95, p) {
     struct msgTx_t msgTx;
     event_listener_t newMsgTx_lis, rf95int_lis;
 
-
     chRegSetThreadName("trataRf95");
     chEvtRegister(&rf95int_source, &rf95int_lis, 1);
     chEvtRegister(&newMsgTx_source, &newMsgTx_lis, 2);
@@ -113,18 +112,18 @@ static THD_FUNCTION(trataRf95, p) {
             // hemos recibido algo ? (por si las moscas)
             if (rf95.available())
                 procesaRx();
-            switch (modoRadio)
-            {
-            case 1:
-                if (llamadorObj)
-                    llamadorObj->trataObsoletoLlamador();
-                break;
-            case 2:
-                if (pozoObj)
-                    pozoObj->trataObsoletoPozo();
-                break;
-            }
-            chLcdprintfFila(3,"");
+            radio::obsoleto();
+//            switch (modoRadio)
+//            {
+//            case 1:
+//                if (llamadorObj)
+//                    llamadorObj->trataObsoletoLlamador();
+//                break;
+//            case 2:
+//                if (pozoObj)
+//                    pozoObj->trataObsoletoPozo();
+//                break;
+//            }
             continue;
         }
         if (evt==EVENT_MASK(1)) // hay una interrupcion de rf95, la procesamos
@@ -138,12 +137,6 @@ static THD_FUNCTION(trataRf95, p) {
             if(getQueu(&colaMsgTx, &msgTx))
             {
                 rf95.send(msgTx.msg,msgTx.numBytes);
-                //bool finNormal = rf95.waitPacketSent(5000);
-               // RH_RF95_setModeRx();
-//                if (finNormal)
-//                    chLcdprintfFila(3,"Enviado msg!!");
-//                else
-//                    chLcdprintfFila(3,"Timeout enviando");
             }
         }
     } while (1==1);

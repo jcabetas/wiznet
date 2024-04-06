@@ -265,7 +265,7 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
 /*
  * Nos llaman cada segundo, para comprobar obsolescencias
  */
-void pozo::trataObsoletoPozo(void)
+void pozo::trataObsoleto(void)
 {
     // llevan mucho tiempo sin conexion?
     uint8_t envioEstado = 0;
@@ -341,32 +341,32 @@ void pozo::trataRx(struct msgRx_t *msgRx)
     }
 }
 
-void pozo::trataRxRf95(eventmask_t evt)
-{
-    struct msgRx_t msgRx;
-    struct msgTx_t msgTx;
-    if (evt==0) // timeout, llamo a rutinas
-    {
-        trataObsoletoPozo();
-    }
-    if (evt & EVENT_MASK(0)) // He recibido un mensaje rf95
-    {
-        while (getQueu(&colaMsgRx, &msgRx))
-        {
-            if (++cnt>99) cnt=0;
-                trataRx(&msgRx);
-        }
-    }
-    if (evt & EVENT_MASK(1)) // Tengo que enviar mensajes rf95
-    {
-        while (getQueu(&colaMsgTx, &msgTx))
-        {
-//            pozoObj->send(msgTx.msg,msgTx.numBytes);
-//            pozoObj->waitPacketSent(100);
-//            pozoObj->setModeRx();
-        }
-    }
-}
+//void pozo::trataRxRf95(eventmask_t evt)
+//{
+//    struct msgRx_t msgRx;
+//    struct msgTx_t msgTx;
+//    if (evt==0) // timeout, llamo a rutinas
+//    {
+//        trataObsoletoPozo();
+//    }
+//    if (evt & EVENT_MASK(0)) // He recibido un mensaje rf95
+//    {
+//        while (getQueu(&colaMsgRx, &msgRx))
+//        {
+////            if (++cnt>99) cnt=0;
+//                trataRx(&msgRx);
+//        }
+//    }
+//    if (evt & EVENT_MASK(1)) // Tengo que enviar mensajes rf95
+//    {
+//        while (getQueu(&colaMsgTx, &msgTx))
+//        {
+////            pozoObj->send(msgTx.msg,msgTx.numBytes);
+////            pozoObj->waitPacketSent(100);
+////            pozoObj->setModeRx();
+//        }
+//    }
+//}
 
 pozo::~pozo()
 {
@@ -383,7 +383,7 @@ const char *pozo::diNombre(void)
     return "POZO";
 }
 
-int8_t pozo::init(void)
+uint8_t pozo::init(void)
 {
     arrancaRadio();
     return 0;

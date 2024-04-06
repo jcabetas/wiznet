@@ -25,6 +25,12 @@
 #define MSG_CLEARERROR              4
 #define MAXERRORESAVISO             5
 
+
+extern "C" {
+    void arrancaRadioC(void);
+}
+
+
 struct datosIdGuardados
 {
     uint32_t numPeticiones;
@@ -47,14 +53,22 @@ struct datosPozoGuardados
     struct datosIdGuardados datosId[8];
 };
 
+
+typedef enum
+{
+    Llamador = 0,
+    Pozo,
+    Registrador
+} ModoRadio;
+
 class radio
 {
 protected:
-    uint16_t modoRadio;
-    uint16_t bombaPozoOn;                        // segun mensajes del pozo
-    uint16_t bombaPozoSolicitada;                 // segun la peticion que le he hecho al pozo
+    ModoRadio modo;  // modoRadio
+    virtual void trataObsoleto(void) = 0;
+    uint16_t bombaPozoOn;                                             // segun mensajes del pozo
     uint16_t numEstadoComOk, numEstadoBomba;
-    static uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // seg�n pozo
+    static uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
     static uint8_t estadoAbusonesOld;
     static time_t timeInicioPeticion[NUMSATELITES];
     static time_t timeUltConexion[NUMSATELITES];
@@ -62,20 +76,25 @@ protected:
     uint8_t idEstacionAviso[MAXERRORESAVISO];
     uint8_t mensajeAviso[MAXERRORESAVISO][21];
     time_t timeInicioAvisoError[MAXERRORESAVISO];
-    uint8_t cnt;
-    static float totEner;
+    uint8_t cntTx, cntRx;
     static radio *radioPtr;
 public:
-    static void apuntaEnergia(float incEner);
-    static void trataRxRf95Radio(eventmask_t evt);
-    virtual void trataRxRf95(eventmask_t evt) = 0;
+//    static void apuntaEnergia(float incEner);
+//    static void trataRxRf95Radio(eventmask_t evt);
+//    virtual void trataRxRf95(eventmask_t evt) = 0;
     virtual void trataRx(struct msgRx_t *msgRx) = 0;
+    virtual uint8_t init(void) = 0;
+    static void obsoleto(void);
+
     static void reseteaHistoriaPozo(void);
     static void reseteaVariables(void);
     virtual void reseteaVariablesEspecificas(void) = 0;
     static void arrancaRadio(void);
     static void paraRadio(void);
     static uint8_t radioDefinida(void);
+    uint8_t getCntTx(void);
+    uint8_t getCntRx(void);
+
     // pozoComun:
     void registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld);
     static void ponEnColaRegistrador(void);
@@ -88,43 +107,34 @@ public:
 class llamador : public radio
 {
 protected:
+    uint16_t bombaPozoSolicitada;                 // segun la peticion que le he hecho al pozo
     uint16_t estadoDeseado;
     uint8_t  estadoComms;
     uint16_t dsAleatorioMinEntreMsgsLlamador;
     uint16_t dsAleatorioMaxEntreMsgsLlamador;
     struct fechaHora dateTimeEnvioAnterior;
     struct fechaHora dateTimeRxPozoAnterior;
-    uint8_t cntTx, cntRx;
+    void trataObsoleto(void);
 public:
     llamador(void);
     ~llamador();
+    static llamador *llamadorPtr;
     void reseteaVariablesEspecificas(void);
     // para implementar "bloque"
     const char *diNombre(void);
-    int8_t init(void);
+    uint8_t init(void);
     void stop(void);
     void print(BaseSequentialStream *tty);
     void update(uint8_t estadoDeseado);
-    uint8_t getCntTx(void);
-    uint8_t getCntRx(void);
     const char *diTipo(void);
-    // objeto "radio" propiamente dicho
-    // pozoComun:
     uint8_t quitarAbuso(uint8_t numEstacion);
     void onCambioParametrosPozo(void);
     uint8_t limpiaError(uint8_t numEstacion, uint8_t numError);
-    //void apuntaEnergia(float incEner);
-
-
-    // llamador
-    void trataObsoletoLlamador(void);
     void enviaStatusLlamacion(void);
     uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
 
 
-    void trataRxRf95(eventmask_t evt);
     void trataRx(struct msgRx_t *msgRx);
-    void trataOrdenSMS(char **Vars, uint16_t numVars);
 };
 
 
@@ -141,7 +151,7 @@ public:
     void reseteaVariablesEspecificas(void);
     // para implementar "bloque"
     const char *diNombre(void);
-    int8_t init(void);
+    uint8_t init(void);
     void stop(void);
     uint8_t calcula(uint8_t hora, uint8_t min, uint8_t seg, uint8_t ds);
     void print(BaseSequentialStream *tty);
@@ -163,14 +173,14 @@ public:
     uint8_t haCambiadoEstados(void);
     uint8_t estadoPeticionBomba(void);
     uint8_t gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg);
-    void trataObsoletoPozo(void);
+    void trataObsoleto(void);
     void trataRxPozo(struct msgRx_t *msgRx);
     // llamador
     void trataObsoletoLlamador(void);
     uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
     void trataRxRegistradoryLlamador(struct msgRx_t *msgRx);
 
-    void trataRxRf95(eventmask_t evt);
+    //void trataRxRf95(eventmask_t evt);
     void trataRx(struct msgRx_t *msgRx);
     void trataOrdenSMS(char **Vars, uint16_t numVars);
 };

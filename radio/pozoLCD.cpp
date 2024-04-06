@@ -241,79 +241,79 @@ void escribeSmsLCD(void)
     chLcdprintfFila(2,"Proveedor:%s",proveedor);
     chLcdprintfFila(3,"");
 }
-
-/*
- * En VACON 100, A negativo, B positivo
- * - Coil register (0001, function 1 read, 5 para write), se refiere a bits en Control word (p.e. RUN)
- * - Discrete input (10001, function 2), es un bit read-only (p.e. run)
- * - Input register (30001, function 4), read only
- * - Holding register (40001, function 3 read, 6 write single, 16 multiple write, 23 read y write) son read/write
- *
- * Los holding registers 40001 se leen con function 3 (16 para varios) en base 0 (HR 40108 se lee en 107)
- *  * Escribir speed reference: function 16 (write multiple registers), address 0x07D0 (2000, control word)
- * Leer speed: function 0x4 (read input registers), (process data out 2103=process data 42103 => leer 2102)
- *
- * Process Data In (function 16 para varios):
- * MODBUS ADDRESS
- * 2000: Run request
- * 2002: speed reference
- *
- * Process data out (function 4):
- * MODBUS ADDRESS
- * 2101: frequency 0.01 Hz
- * 2102: speed rpm (process data 42103)
- * 2103: motor current 0.1A
- * 2104: motor torque 0.1%
- * 2105: motor power 0.1%
- *
- * Posiblemente (address no modbus):
- * Analog input 1: 59 (%*0,01)
- * Idem An2: 60
- * PID out: 23 (%*0.01)
- * PID status: 24 (0: stopped, 1: running, 3: sleep, 4: in dead-band)
- *
- */
-
-void debugModbus(void)
-{
-    int32_t function, idModbus, addressReg, sigue;
-    int16_t error;
-    uint16_t valor;
-    function = 4;
-    addressReg =2101;
-    if (leeNumeroLCD("Funcion",&function,4,0x16))
-        return;
-    idModbus = 1;
-    if (leeNumeroLCD("id",&idModbus,1,4))
-        return;
-    do
-    {
-        if (leeNumeroLCD("Address",&addressReg,2000,2200))
-            return;
-        for (uint8_t i=0;i<8;i++)
-        {
-            buffer[i] = 0;
-            bufferRx[i] = 0;
-        }
-        valor = leeSDMHex(idModbus, function, addressReg, &error);
-        chLcdprintfFila(0,"=> %02X%02X%02X%02X%02X%02X%02X%02X",buffer[0], buffer[1], buffer[2], buffer[3],buffer[4], buffer[5], buffer[6], buffer[7]);
-        if (error==0)
-        {
-            chLcdprintfFila(1,"Exito, val=%4X",valor);
-            chLcdprintfFila(2,"<= %02X%02X%02X%02X%02X%02X%02X",bufferRx[0], bufferRx[1], bufferRx[2], bufferRx[3],bufferRx[4], bufferRx[5], bufferRx[6]);
-        }
-        else
-        {
-            chLcdprintfFila(1,"Err %d bytesRx:%d",error,bytesReceived);
-            chLcdprintfFila(2,"<= %02X%02X%02X%02X%02X%02X%02X",bufferRx[0], bufferRx[1], bufferRx[2], bufferRx[3],bufferRx[4], bufferRx[5], bufferRx[6]);
-        }
-        chThdSleepMilliseconds(10000);
-        sigue = 1;
-        leeNumeroLCD("Sigue?",&sigue,0,1);
-        if (!sigue)
-            return;
-    } while (TRUE);
-}
+//
+///*
+// * En VACON 100, A negativo, B positivo
+// * - Coil register (0001, function 1 read, 5 para write), se refiere a bits en Control word (p.e. RUN)
+// * - Discrete input (10001, function 2), es un bit read-only (p.e. run)
+// * - Input register (30001, function 4), read only
+// * - Holding register (40001, function 3 read, 6 write single, 16 multiple write, 23 read y write) son read/write
+// *
+// * Los holding registers 40001 se leen con function 3 (16 para varios) en base 0 (HR 40108 se lee en 107)
+// *  * Escribir speed reference: function 16 (write multiple registers), address 0x07D0 (2000, control word)
+// * Leer speed: function 0x4 (read input registers), (process data out 2103=process data 42103 => leer 2102)
+// *
+// * Process Data In (function 16 para varios):
+// * MODBUS ADDRESS
+// * 2000: Run request
+// * 2002: speed reference
+// *
+// * Process data out (function 4):
+// * MODBUS ADDRESS
+// * 2101: frequency 0.01 Hz
+// * 2102: speed rpm (process data 42103)
+// * 2103: motor current 0.1A
+// * 2104: motor torque 0.1%
+// * 2105: motor power 0.1%
+// *
+// * Posiblemente (address no modbus):
+// * Analog input 1: 59 (%*0,01)
+// * Idem An2: 60
+// * PID out: 23 (%*0.01)
+// * PID status: 24 (0: stopped, 1: running, 3: sleep, 4: in dead-band)
+// *
+// */
+//
+//void debugModbus(void)
+//{
+//    int32_t function, idModbus, addressReg, sigue;
+//    int16_t error;
+//    uint16_t valor;
+//    function = 4;
+//    addressReg =2101;
+//    if (leeNumeroLCD("Funcion",&function,4,0x16))
+//        return;
+//    idModbus = 1;
+//    if (leeNumeroLCD("id",&idModbus,1,4))
+//        return;
+//    do
+//    {
+//        if (leeNumeroLCD("Address",&addressReg,2000,2200))
+//            return;
+//        for (uint8_t i=0;i<8;i++)
+//        {
+//            buffer[i] = 0;
+//            bufferRx[i] = 0;
+//        }
+//        valor = leeSDMHex(idModbus, function, addressReg, &error);
+//        chLcdprintfFila(0,"=> %02X%02X%02X%02X%02X%02X%02X%02X",buffer[0], buffer[1], buffer[2], buffer[3],buffer[4], buffer[5], buffer[6], buffer[7]);
+//        if (error==0)
+//        {
+//            chLcdprintfFila(1,"Exito, val=%4X",valor);
+//            chLcdprintfFila(2,"<= %02X%02X%02X%02X%02X%02X%02X",bufferRx[0], bufferRx[1], bufferRx[2], bufferRx[3],bufferRx[4], bufferRx[5], bufferRx[6]);
+//        }
+//        else
+//        {
+//            chLcdprintfFila(1,"Err %d bytesRx:%d",error,bytesReceived);
+//            chLcdprintfFila(2,"<= %02X%02X%02X%02X%02X%02X%02X",bufferRx[0], bufferRx[1], bufferRx[2], bufferRx[3],bufferRx[4], bufferRx[5], bufferRx[6]);
+//        }
+//        chThdSleepMilliseconds(10000);
+//        sigue = 1;
+//        leeNumeroLCD("Sigue?",&sigue,0,1);
+//        if (!sigue)
+//            return;
+//    } while (TRUE);
+//}
 
 
 static THD_WORKING_AREA(displayPozo_wa,1400);

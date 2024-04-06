@@ -39,6 +39,7 @@ extern uint16_t avisaAbuso;
 extern uint16_t tiempoAbuso;         // minutos
 extern uint16_t dsMaxEntreMsgsPozo;
 extern uint16_t dsMinEntreMsgsPozo;
+extern uint16_t idVacon;
 
 
 bool sdHM10open = false;
@@ -68,6 +69,7 @@ struct opcion_t opcAVS =  { &avisaAbuso, 0 ,1, "Avisa abuso"};
 struct opcion_t opcTAB =  { &tiempoAbuso, 120 ,1200, "Tiempo abuso (min)"};
 struct opcion_t opcTMPZ = { &dsMaxEntreMsgsPozo, 100 ,3000, "Tiempo max. entre msgs (ds)"};
 struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs (ds)"};
+struct opcion_t opcVacon = { &idVacon, 1 ,100, "Modbus Addr Vacon"};
 
 
 /*
@@ -227,9 +229,10 @@ void ajustaVariables(SerialDriver *sdCOM)
             chprintf(ttyCOM,"5 Tiempo abuso: %d min\n",tiempoAbuso);
             chprintf(ttyCOM,"6 Tiempo max entre msgs: %d (ds)\n",dsMaxEntreMsgsPozo);
             chprintf(ttyCOM,"7 Tiempo min entre msgs: %d (ds)\n",dsMinEntreMsgsPozo);
-            chprintf(ttyCOM,"8 salir\n");
-            result = preguntaNumeroHM10((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 8);
-            if (result != 0 || (result==0 && opcion==8))
+            chprintf(ttyCOM,"8 Id. Modbus Vacon: %d\n",idVacon);
+            chprintf(ttyCOM,"9 salir\n");
+            result = preguntaNumeroHM10((BaseChannel *) sdCOM, "Dime opcion", &opcion, 1, 9);
+            if (result != 0 || (result==0 && opcion==9))
                 return;
             if (opcion==1)
                 ajustaValor(bcCOM, &opcMR);
@@ -245,6 +248,8 @@ void ajustaVariables(SerialDriver *sdCOM)
                 ajustaValor(bcCOM, &opcTMPZ);
             if (opcion==7)
                 ajustaValor(bcCOM, &opcTmPZ);
+            if (opcion==8)
+                ajustaValor(bcCOM, &opcVacon);
         }
     }
 }

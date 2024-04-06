@@ -7,15 +7,23 @@ using namespace chibios_rt;
 #include "colas.h"
 #include "radio.h"
 #include "calendarUTC.h"
+#include "lcd.h"
 
 void arrancaPozo(void);
 uint8_t esValle(void);
 void int2str(uint8_t valor, char *string);
+void initRF95(void);
 
 extern mutex_t MtxMedidas;
 extern struct queu_t colaCambiosPozo;
 extern event_source_t registraMsgPozo_source;
 struct msgRx_t ultMsg;
+
+extern uint16_t modoRadio;
+
+extern "C" {
+    void arrancaRadioC(void);
+}
 
 /*
  * RADIO LLAMADOR pideAgua idLlamador dsMinEntreMsgsLlamador dsMaxEntreMsgsLlamador
@@ -24,15 +32,16 @@ struct msgRx_t ultMsg;
  *
  */
 
-radio *radio::radioPtr = NULL;;
+radio *radio::radioPtr = NULL;
 uint8_t radio::estadoLlamaciones = 0;
 uint8_t radio::estadoActivos = 0;
 uint8_t radio::estadoAbusones = 0;
 uint8_t radio::estadoAbusonesOld = 0;
 time_t radio::timeUltConexion[] = {0};
 time_t radio::timeInicioPeticion[] = {0};
-float radio::totEner = 0.0f;
+//float radio::totEner = 0.0f;
 
+llamador *llamador::llamadorPtr = NULL;
 
 void radio::reseteaVariables(void)
 {
@@ -51,17 +60,6 @@ void radio::reseteaVariables(void)
         radioPtr->reseteaVariablesEspecificas();
 }
 
-
-void radio::trataRxRf95Radio(eventmask_t evt)
-{
-    if (radio::radioPtr!=NULL)
-        radioPtr->trataRxRf95(evt);
-}
-
-//void radio::apuntaEnergia(float incEner)
-//{
-//    totEner += incEner;
-//}
 
 uint8_t radio::radioDefinida(void)
 {
@@ -135,36 +133,36 @@ uint8_t radio::limpiaError(uint8_t numEstacion, uint8_t numError)
     return 0;
 }
 
-void radio::apuntaEnergia(float incEner)
-{
-    uint8_t esValleVal;
-    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
-    esValleVal = esValle();
-    // Energia total
-    chMtxLock(&MtxMedidas);
-    datos->kWhTotal += incEner;
-    if (esValleVal)
-        datos->kWhValle += incEner;
-    else
-        datos->kWhPunta += incEner;
-    chMtxUnlock(&MtxMedidas);
-    // ahora a las estaciones
-    if (estadoLlamaciones==0)
-        return;
-    for (uint8_t est=0;est<8;est++)
-    {
-        uint8_t estLlama = (estadoLlamaciones>>est) & 1;
-        if (estLlama==1)
-        {
-            chMtxLock(&MtxMedidas);
-            if (esValleVal)
-                datos->datosId[est].kWhValle += incEner;
-            else
-                datos->datosId[est].kWhPunta += incEner;
-            chMtxUnlock(&MtxMedidas);
-        }
-    }
-}
+//void radio::apuntaEnergia(float incEner)
+//{
+//    uint8_t esValleVal;
+//    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+//    esValleVal = esValle();
+//    // Energia total
+//    chMtxLock(&MtxMedidas);
+//    datos->kWhTotal += incEner;
+//    if (esValleVal)
+//        datos->kWhValle += incEner;
+//    else
+//        datos->kWhPunta += incEner;
+//    chMtxUnlock(&MtxMedidas);
+//    // ahora a las estaciones
+//    if (estadoLlamaciones==0)
+//        return;
+//    for (uint8_t est=0;est<8;est++)
+//    {
+//        uint8_t estLlama = (estadoLlamaciones>>est) & 1;
+//        if (estLlama==1)
+//        {
+//            chMtxLock(&MtxMedidas);
+//            if (esValleVal)
+//                datos->datosId[est].kWhValle += incEner;
+//            else
+//                datos->datosId[est].kWhPunta += incEner;
+//            chMtxUnlock(&MtxMedidas);
+//        }
+//    }
+//}
 
 void radio::reseteaHistoriaPozo(void)
 {
@@ -187,13 +185,20 @@ void radio::reseteaHistoriaPozo(void)
 }
 
 
+uint8_t radio::getCntTx(void)
+{
+    return cntTx;
+}
+
+uint8_t radio::getCntRx(void)
+{
+    return cntRx;
+}
+
 
 void radio::ponEnColaRegistrador(void)
 {
     struct cambiosPozo_t estadoPozo;
-//    if (montarSD->valor()==0)
-//    if (montarSDValor()==0)
-//        return;
     // pon en cola de registrador
     estadoPozo.timet = calendar::getSecUnix();
     estadoPozo.estActi = estadoActivos;
@@ -210,7 +215,57 @@ void radio::ponEnColaRegistrador(void)
 }
 
 
+void radio::arrancaRadio(void)
+{
+    if (modoRadio==1)
+    {
+        if (radioPtr!=NULL)
+        {
+            chLcdprintfFila(3,"Radio ya arrancada?");
+            return;
+        }
+        chLcdprintfFila(3,"Arranco llamador");
+        llamador::llamadorPtr = new llamador();
+        radioPtr = (radio *) llamador::llamadorPtr;
+        radioPtr->init();
+    }
+    initRF95();
+}
 
+/*
+ * Registra cambios segun estadoLlamaciones
+ */
+void radio::registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld)
+{
+    time_t ahora = calendar::getSecUnix();
+    for (uint8_t est=0;est<8;est++)
+    {
+        uint8_t estadoOld = (estLlamacionesOld>>est) & 1;
+        uint8_t estadoNew = (estLlamaciones>>est) & 1;
+        if (estadoNew && !estadoOld) // empieza a pedir
+            timeInicioPeticion[est] = ahora;
+        if (!estadoNew && estadoOld) // deja de pedir
+        {
+            // registro en memoria permanente
+            uint32_t tiempoOn = ahora - timeInicioPeticion[est];
+//            struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+//            datos->datosId[est].segundosPeticion += tiempoOn;
+//            datos->datosId[est].numPeticiones += 1;
+        }
+    }
+}
+
+
+void arrancaRadioC(void)
+{
+    radio::arrancaRadio();
+}
+
+void radio::obsoleto(void)
+{
+    if (radioPtr)
+        radioPtr->trataObsoleto();
+}
 /*
  *  varNUMERO idLlamador(18,8,1,8,"Id Llamador");
     varNUMERO dsMinEntreMsgsLlamador(19,5,2,60,"Tmn Msg Ll ds");
@@ -279,12 +334,12 @@ void radio::ponEnColaRegistrador(void)
 //
 //const char *radio::diTipo(void)
 //{
-//	return "RADIO";
+//  return "RADIO";
 //}
 //
 //const char *radio::diNombre(void)
 //{
-//	return "RADIO";
+//  return "RADIO";
 //}
 //
 //int8_t radio::init(void)

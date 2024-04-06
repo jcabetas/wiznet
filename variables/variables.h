@@ -19,6 +19,8 @@
 #define     POSDSMAXENTREMSGSPOZO       26
 #define     POSDSMINENTREMSGSPOZO       28
 
+#define     POSIDVACON                  30
+
 
 uint8_t leeVariables(void);
 void escribeVariables(void);

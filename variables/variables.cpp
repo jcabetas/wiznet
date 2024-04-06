@@ -28,6 +28,8 @@ uint16_t tiempoAbuso;         // minutos
 uint16_t dsMaxEntreMsgsPozo;
 uint16_t dsMinEntreMsgsPozo;
 
+uint16_t idVacon;
+
 
 void initSpiPinsCPP(void);
 
@@ -49,6 +51,7 @@ void imprimeVariables(void)
     chprintf(ttyCOM,"- Id llamador: %d,  ds max entre msgs:%d s,  ds min:%d\n",idLlamador, dsMaxEntreMsgsLlamador, dsMinEntreMsgsLlamador);
     chprintf(ttyCOM,"- Bloqueo abusones: %d,  avisaAbuso:%d,  tiempo abuso :%d min, ds max entre msgs:%d s,  ds min:%d\n",
              bloqueoAbusones, avisaAbuso, tiempoAbuso, dsMaxEntreMsgsPozo, dsMinEntreMsgsPozo);
+    chprintf(ttyCOM,"- IdModbus Vacon: %d\n",idVacon);
 }
 
 
@@ -79,6 +82,8 @@ uint8_t leeVariables(void)
       tiempoAbuso = W25Q16_read_u16(0, POSTIEMPOABUSOMINUTOS);
       dsMaxEntreMsgsPozo = W25Q16_read_u16(0, POSDSMAXENTREMSGSPOZO);
       dsMinEntreMsgsPozo = W25Q16_read_u16(0, POSDSMINENTREMSGSPOZO);
+
+      idVacon = W25Q16_read_u16(0, POSIDVACON);
   }
   else
   {
@@ -96,6 +101,8 @@ uint8_t leeVariables(void)
       tiempoAbuso = 600;
       dsMaxEntreMsgsPozo = 600;
       dsMinEntreMsgsPozo = 20;
+
+      idVacon = 1;
   }
   spiStop(&SPID1);
   return hayW25q16;
@@ -111,7 +118,6 @@ uint16_t reseteaEeprom(void)
 
 void escribeVariables(void)
 {
-//  initSpiPinsCPP();
   if (W25Q16_start()) // hay w25q16 instalado?
   {
       W25Q16_sectorErase(0);
@@ -129,6 +135,8 @@ void escribeVariables(void)
       W25Q16_write_u16(0, POSDSMAXENTREMSGSPOZO, dsMaxEntreMsgsPozo);
       W25Q16_write_u16(0, POSDSMINENTREMSGSPOZO, dsMinEntreMsgsPozo);
 
+      W25Q16_write_u16(0, POSIDVACON, idVacon);
+
       W25Q16_write_u16(0, 0, 0x7851);
   }
   spiStop(&SPID1);
@@ -140,46 +148,5 @@ void leeVariablesC(void)
   leeVariables();
   imprimeVariables();
 }
-
-
-//static const SPIConfig spicfg = {
-//    .circular         = false,
-//    .slave            = false,
-//    .data_cb          = NULL,
-//    .error_cb         = NULL,
-//    .ssport           = GPIOA,
-//    .sspad            = GPIOA_W25Q16_CS,
-//    .cr1              = SPI_CR1_BR_0 | SPI_CR1_BR_1 | SPI_CR1_CPOL | SPI_CR1_CPHA,
-//    .cr2              = 0U
-//};
-//
-
-//uint16_t initW25q16(void)
-//{
-//    // defino los pines
-//    /*
-//     * CS -   PA4
-//     * SCK -  PA5    SPI1_SCK
-//     * MISO - PA6    SPI1_MISO
-//     * MOSI - PA7    SPI1_MOSI
-//     */
-//    palSetLine(LINE_W25Q16_CS);
-//    palSetLineMode(LINE_W25Q16_CS, PAL_MODE_OUTPUT_PUSHPULL);
-//    palClearLine(LINE_SPI1_SCK);
-//    palClearLine(LINE_SPI1_MOSI);
-//    palClearLine(LINE_SPI1_MISO);
-//
-//    palSetLineMode(LINE_SPI1_SCK,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* SPI SCK.             */
-//    palSetLineMode(LINE_SPI1_MISO,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* MISO.                */
-//    palSetLineMode(LINE_SPI1_MOSI,
-//                     PAL_MODE_ALTERNATE(5) |
-//                     PAL_STM32_OSPEED_HIGHEST);         /* MOSI.                */
-//    spiStart(&SPID1, &spicfg);
-//    return W25Q16_init();
-//}
 
 
