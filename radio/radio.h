@@ -97,7 +97,7 @@ public:
     uint8_t getCntRx(void);
 
     // pozoComun:
-    void registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld);
+    //void registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld);
     static void ponEnColaRegistrador(void);
     uint8_t buscoSlot(uint8_t numError, uint8_t numEstacion, uint8_t *slot);
     void actualizoErrorDesdeLlamador(uint8_t numEstacion, uint8_t numError, uint8_t *msgError);
@@ -127,9 +127,6 @@ public:
     void print(BaseSequentialStream *tty);
     void update(uint8_t estadoDeseado);
     const char *diTipo(void);
-    uint8_t quitarAbuso(uint8_t numEstacion);
-    void onCambioParametrosPozo(void);
-    uint8_t limpiaError(uint8_t numEstacion, uint8_t numError);
     void enviaStatusLlamacion(void);
     uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
 };
@@ -182,6 +179,26 @@ public:
     void trataOrdenSMS(char **Vars, uint16_t numVars);
 };
 
+
+
+class registrador : public radio
+{
+protected:
+    uint8_t  estadoComms;
+    struct fechaHora dateTimeRxPozoAnterior;
+public:
+    registrador(void);
+    ~registrador();
+    void obsoleto(void);
+    void trataRx(struct msgRx_t *msgRx);
+    void reseteaVariablesEspecificas(void);
+    const char *diNombre(void);
+    uint8_t init(void);
+    void stop(void);
+    void print(BaseSequentialStream *tty);
+    const char *diTipo(void);
+    uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
+};
 
 
 #endif /* RADIO_RADIO_H_ */

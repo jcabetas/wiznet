@@ -15,85 +15,81 @@ using namespace chibios_rt;
 #include "chprintf.h"
 #include <stdio.h>
 #include "colas.h"
-#include "bloques.h"
+#include "RH_RF95.h"
 #include "radio.h"
-#include "nextion.h"
+#include "calendarUTC.h"
+#include "lcd.h"
 
-uint32_t msEntreFechas(RTCDateTime *fechaNew, RTCDateTime *fechaOld);
+#include <stdlib.h>
+
+
+
+
+//uint32_t msEntreFechas(RTCDateTime *fechaNew, RTCDateTime *fechaOld);
+//time_t GetTimeUnixSec(void);
 int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
-
 extern struct queu_t colaMsgTx;
 extern event_source_t newMsgTx_source;
 extern struct queu_t colaMsgRx;
+extern event_source_t newMsgRx_source;
+extern event_source_t newMsgRx_source;
 
 extern struct msgRx_t ultMsg;
-extern event_source_t hayRxParaLCD_source;
-extern event_source_t hayCambiosLCD_source;
 
-// REGISTRADOR [sOlv 10] logPozo.pozo.txt bPozo.pozo.pic.0 comOk.pozo.pic.13 llam.pozo.txt act.pozo.txt abu.pozo.txt
-registrador::registrador(BaseSequentialStream *tty,uint8_t numPar, char *pars[], uint8_t *hayError)
+extern uint16_t modoRadio;
+extern uint16_t sOlvido;
+extern uint16_t dsMaxEntreMsgsLlamador;
+extern uint16_t dsMinEntreMsgsLlamador;
+
+
+thread_t *procesoRegistrador = NULL;
+
+extern "C"
 {
-    uint8_t tipoNextion, picBase;
-    if (numPar!=8)
-    {
-        nextion::enviaLog(tty,"#parametros incorrectos REGISTRADOR");
-        *hayError = 1;
-        return;
-    }
-    modoRadio = MODOREGISTRADOR;
-    sOlvido = parametro::addParametroU16FlashMinMax(tty, pars[1],20,3600,hayError);
-    hallaNombreyDatosNextion(pars[2], TIPONEXTIONSTR, &idNombreLog, &idNombreLogWWW, &idPageLog, &tipoNextion, &picBase);
-    numEstadoBomba = estados::addEstado(tty, pars[3], 1, hayError);
-    numEstadoComOk = estados::addEstado(tty, pars[4], 1, hayError);
-    hallaNombreyDatosNextion(pars[5], TIPONEXTIONSILENCIO, &idNombreLlamadores, &idNombreLlamadoresWWW, &idPageLlamadores, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-        nextion::enviaLog(tty,"REGISTRADOR llamadores no txt");
-        *hayError = 1;
-    }
-    // nextion activos
-    hallaNombreyDatosNextion(pars[6], TIPONEXTIONSILENCIO, &idNombreActivos, &idNombreActivosWWW, &idPageActivos, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-         nextion::enviaLog(tty,"REGISTRADOR activos no txt");
-         *hayError = 1;
-    }
-    // nextion abusones
-    hallaNombreyDatosNextion(pars[7], TIPONEXTIONSILENCIO, &idNombreAbusones, &idNombreAbusonesWWW, &idPageAbusones, &tipoNextion, &picBase);
-    if (tipoNextion!=TIPONEXTIONSTR)
-    {
-         nextion::enviaLog(tty,"REGISTRADOR abusones no txt");
-         *hayError = 1;
-    }
-    radioPtr = this;
+    void registradorInit(void);
+}
+
+
+registrador::registrador(void)
+{
+    modoRadio = Registrador;
+    bombaPozoOn = 0;
+    calendar::getFechaHora(&dateTimeRxPozoAnterior);
+    estadoComms = 0;
 }
 
 
 
-void registrador::reseteaVariablesEspecificas(void)
+
+void registrador::obsoleto(void)
 {
+    // ha pasado mucho tiempo sin recibir?
+    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
+    {
+        numEstadoComOk = 0;
+    }
 }
+
+
 
 
 /*
- *  Trata la recepci�n de una notificaci�n del pozo
+ *  Trata la recepcion de una notificacion del pozo
  *  Devuelve 1 si hay cambios
  */
 uint8_t registrador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg)
 {
-    uint8_t estadoLlamacionesOld, estadoActivosOld, estadoAbusonesOld, petBombaOld;
+    uint8_t estadoLlamacionesOld, estadoActivosOld, petBombaOld;
     estadoLlamacionesOld = estadoLlamaciones;
-    estadoActivosOld = bombaPozoOn;
-    estadoAbusonesOld = estadoAbusones;
-    petBombaOld = bombaPozoOn;
+    estadoActivosOld = estadoActivos;
+    petBombaOld = bombaPozoOn; //estados::diEstado(numInput);//petBomba;
     estadoLlamaciones = estadoLlamacionesMsg;
     estadoActivos = estadoActivosMsg;
+    estadoAbusonesOld = estadoAbusones;
     bombaPozoOn = petBombaMsg;
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || bombaPozoOn!=petBombaOld)
     {
-        ponEnColaRegistrador();     // guardar en SD
-        actualizaNextion(estadoLlamacionesOld, estadoActivosOld, estadoAbusonesOld, petBombaOld);
         return 1;
     }
     else
@@ -104,14 +100,17 @@ void registrador::trataRx(struct msgRx_t *msgRx)
 {
     uint8_t msgId = msgRx->msg[0];
     uint8_t estProblematica;
-    uint16_t numBytes;
-    uint8_t bufError[25];
+    char buffer[40];
+    uint8_t bufError[10];
+    struct tm fechHora;
+    if (++cntRx>99)
+        cntRx = 0;
     // Formato del mensaje:
     //    Byte 0: MSG_STATUSPOZO
-    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 sat�lites llamadores
+    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
     //    Byte 2: Estado bomba del Pozo '0' '1'
-    //    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el sat�lite ha de transmitir como mucho cada 15 segundos
-    //    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una se�al de llamaci�n de un sat�lite. Se distribuye a todo el mundo, para que todos puedan saber la situaci�n
+    //    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el satelite ha de transmitir como mucho cada 15 segundos
+    //    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una senyal de llamacion de un satelite. Se distribuye a todo el mundo, para que todos puedan saber la situacion
     if (msgId==MSG_STATUSPOZO && msgRx->numBytes==5 && msgRx->msg[1]==0 && (msgRx->msg[2] == '0' || msgRx->msg[2] =='1'))
     {
         uint8_t numEstMsg = msgRx->msg[1];
@@ -119,13 +118,17 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         uint8_t estadoActivosMsg = msgRx->msg[3];
         uint8_t estadoLlamacionesMsg = msgRx->msg[4];
         calendar::getFechaHora(&dateTimeRxPozoAnterior);
-        estados::ponEstado(numEstadoComOk, 1);
-        estados::actualizaNextion(numEstadoComOk);
+        numEstadoComOk = 1;
         if (numEstMsg==0 && (petBombaMsg==0 || petBombaMsg==1))
         {
             gestionaEstadoPozo(petBombaMsg, estadoLlamacionesMsg, estadoActivosMsg);
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
-            chEvtBroadcast(&hayRxParaLCD_source);
+            calendar::gettm(&fechHora);
+            chsnprintf(buffer,sizeof(buffer),"Pozo B:%d RSSI:%d", petBombaMsg, msgRx->rssi);
+            escribeLCD(buffer);
+//            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
+//            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
+//            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
         }
     }
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
@@ -136,11 +139,17 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         if (numEstMsg>=1 && numEstMsg<=8 && (petBombaMsg==0 || petBombaMsg==1))
         {
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
-            chEvtBroadcast(&hayRxParaLCD_source);
+            calendar::gettm(&fechHora);
+            chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEstMsg,petBombaMsg, msgRx->rssi);
+            escribeLCD(buffer);
+//            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
+//            chLcdprintfFila(0,buffer);
+//            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
+//            chLcdprintfFila(1,buffer);
         }
     }
     // Tipo de Mensaje MSG_ERROR. Longitud=variable, de 4 a un maximo de 24 bytes
-    // Este mensaje es un beacon que se envia desde el satelite, indicando errores
+    // Este mensaje es un beacon que se envia desde el satelite, indicando extern volatile int16_t _lastRssi;
     //
     // Formato del mensaje:
     //    Byte 0: MSG_ERROR
@@ -155,25 +164,33 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
+        uint8_t estadoAbusonesOld = estadoAbusones;
         estProblematica = msgRx->msg[3];
         estadoAbusones |= (1<<(estProblematica-1));
-        numBytes = msgRx->msg[4];
+        uint8_t numBytes = msgRx->msg[4];
         if (numBytes>sizeof(bufError))
             numBytes = sizeof(bufError);
         memcpy(bufError, &msgRx->msg[5],numBytes);
         bufError[numBytes] = 0; // fin de cadena
         actualizoErrorDesdeLlamador(estProblematica, numError, bufError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        chEvtBroadcast(&hayRxParaLCD_source);
+        if (estadoAbusones != estadoAbusonesOld)
+        {
+            calendar::gettm(&fechHora);
+            chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
+            escribeLCD(buffer);
+//            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
+//            chLcdprintfFila(1,"msg:'%s'",bufError);
+        }
     }
     // Tipo de Mensaje MSG_CLEARERROR. Longitud=4
-    // Este mensaje lo envia el Pozo si ha desaparecido un error de una estaci�n
+    // Este mensaje lo envia el Pozo si ha desaparecido un error de una estacion
     //
     // Formato del mensaje:
     //    Byte 0: MSG_CLEARERROR
-    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 sat�lites llamadores
-    //    Byte 2: Numero de error
-    //    Byte 3: Id estacion con problemas resueltos. 0=Pozo, 1 a 8 sat�lites llamadores
+    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
+    //    Byte 2: Nemero de error
+    //    Byte 3: Id estacion con problemas resueltos. 0=Pozo, 1 a 8 satelites llamadores
     //
     if (msgId==MSG_CLEARERROR && msgRx->numBytes==4)
     {
@@ -181,33 +198,17 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
+        uint8_t estadoAbusonesOld = estadoAbusones;
         estProblematica = msgRx->msg[3];
         estadoAbusones &= ~(1<<(estProblematica-1));
-        limpiaError(estProblematica, numError);
+        radio::limpiaError(estProblematica, numError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        chEvtBroadcast(&hayRxParaLCD_source);
-    }
-}
-
-
-
-void registrador::trataRxRf95(eventmask_t evt)
-{
-    struct msgRx_t msgRx;
-    if (evt==0) // timeout
-    {
-        if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido->valor())
+        if (estadoAbusones != estadoAbusonesOld)
         {
-            estados::ponEstado(numEstadoComOk, 0);
-        }
-    }
-    // if (evt & EVENT_MASK(1)) // Tengo que enviar mensajes rf95 (como registrador, no puedo)
-    if (evt & EVENT_MASK(0)) // He recibido un mensaje rf95
-    {
-        while (getQueu(&colaMsgRx, &msgRx))
-        {
-            if (++cnt>99) cnt=0;
-                trataRx(&msgRx);
+            calendar::gettm(&fechHora);
+            chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
+            escribeLCD(buffer);
+//            chLcdprintfFila(1,"");
         }
     }
 }
@@ -215,53 +216,66 @@ void registrador::trataRxRf95(eventmask_t evt)
 
 registrador::~registrador()
 {
-    radioPtr = NULL;
+    paraRadio();
 }
 
 const char *registrador::diTipo(void)
 {
-    return "REGISTRADOR";
+    return "LLAMADOR";
 }
 
 const char *registrador::diNombre(void)
 {
-    return "REGISTRADOR";
+    return "LLAMADOR";
 }
 
-int8_t registrador::init(void)
-{
-    arrancaRadio();
-    return 0;
-}
 
 void registrador::stop(void)
 {
     paraRadio();
 }
 
-void registrador::addTime(uint16_t , uint8_t , uint8_t , uint8_t , uint8_t )
-{
+
+registrador *registradorObj;
+
+/*
+ * Gestor registrador
+ * Trato mensajes recibidos
+ */
+static THD_WORKING_AREA(waThreadRegistrador, 2000);
+static THD_FUNCTION(ThreadRegistrador, arg) {
+    (void)arg;
+    struct msgRx_t msgRx;
+    event_listener_t el0;
+    chRegSetThreadName("registrador");
+    chEvtRegister(&newMsgRx_source, &el0, 1);
+    while(!chThdShouldTerminateX()) {
+        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
+        if (chThdShouldTerminateX())
+            chThdExit((msg_t) 1);
+        if (evt == 0)  // timeout
+        {
+            registradorObj->obsoleto();
+            continue;
+        }
+        if (evt == EVENT_MASK(1))  // he recibido un mensaje, que esta en la cola
+        {
+            while (getQueu(&colaMsgRx, &msgRx))
+            {
+                //llamador::llamadorPtr->trataRx(&msgRx);
+                registradorObj->trataRx(&msgRx);
+            }
+        }
+    }
 }
 
-void registrador::print(BaseSequentialStream *tty)
+
+uint8_t registrador::init(void)
 {
-    char buffer[60];
-    chsnprintf(buffer,sizeof(buffer),"REGISTRADOR bOn:%s-%d commOk:%s-%d",estados::nombre(numEstadoBomba),numEstadoBomba,\
-               estados::nombre(numEstadoComOk),numEstadoComOk);
-    if (tty!=NULL)
-        nextion::enviaLog(tty, buffer);
+    modo = Registrador;
+    calendar::getFechaHora(&dateTimeRxPozoAnterior);
+    if (!procesoRegistrador)
+        procesoRegistrador = chThdCreateStatic(waThreadRegistrador, sizeof(waThreadRegistrador), NORMALPRIO + 7,  ThreadRegistrador, NULL);
+    return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 

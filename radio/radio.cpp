@@ -235,9 +235,48 @@ void radio::ponEnColaRegistrador(void)
 
 extern llamador *llamadorObj;
 extern pozo *pozoObj;
+extern registrador *registradorObj;
 extern thread_t *procesoLlamador;
 extern thread_t *procesoSensor;
 extern thread_t *procesoPozo;
+extern thread_t *procesoRegistrador;
+
+
+void mataLlamador(void)
+{
+    if (procesoLlamador!=NULL)
+    {
+        chThdTerminate(procesoLlamador);
+        chThdWait(procesoLlamador);
+        procesoLlamador = NULL;
+        return;
+    }
+    if (procesoSensor!=NULL)
+    {
+        chThdTerminate(procesoSensor);
+        chThdWait(procesoSensor);
+        procesoSensor = NULL;
+    }
+}
+
+void mataPozo(void)
+{
+    if (procesoPozo==NULL)
+        return;
+    chThdTerminate(procesoPozo);
+    chThdWait(procesoPozo);
+    procesoPozo = NULL;
+}
+
+void mataRegistrador(void)
+{
+    if (procesoRegistrador==NULL)
+        return;
+    chThdTerminate(procesoRegistrador);
+    chThdWait(procesoRegistrador);
+    procesoPozo = NULL;
+}
+
 
 void radio::arrancaRadio(void)
 {
@@ -248,13 +287,8 @@ void radio::arrancaRadio(void)
             chLcdprintfFila(3,"Llamador ya arrancadoa?");
             return;
         }
-        // hay que matar el pozo?
-        if (procesoPozo!=NULL)
-        {
-            chThdTerminate(procesoPozo);
-            chThdWait(procesoPozo);
-            procesoPozo = NULL;
-        }
+        mataPozo();
+        mataRegistrador();
         llamadorObj = new llamador();
         chLcdprintfFila(3,"Arranco llamador");
         llamadorObj->init();
@@ -266,45 +300,50 @@ void radio::arrancaRadio(void)
             chLcdprintfFila(3,"Pozo ya arrancadoa?");
             return;
         }
-        // hay que matar el llamador y sensor?
-        if (procesoLlamador!=NULL)
-        {
-            chThdTerminate(procesoLlamador);
-            chThdTerminate(procesoSensor);
-            chThdWait(procesoLlamador);
-            chThdWait(procesoSensor);
-            procesoLlamador = NULL;
-            procesoSensor = NULL;
-        }
+        mataLlamador();
+        mataRegistrador();
         pozoObj = new pozo();
         chLcdprintfFila(3,"Arranco pozo");
         pozoObj->init();
     }
+    else if (modoRadio==Registrador)
+    {
+        if (registradorObj!=NULL)
+        {
+            chLcdprintfFila(3,"Registrador ya arrancadoa?");
+            return;
+        }
+        mataLlamador();
+        mataPozo();
+        registradorObj = new registrador();
+        chLcdprintfFila(3,"Arranco registrador");
+        registradorObj->init();
+    }
     initRF95();
 }
 
-/*
- * Registra cambios segun estadoLlamaciones
- */
-void radio::registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld)
-{
-    time_t ahora = calendar::getSecUnix();
-    for (uint8_t est=0;est<8;est++)
-    {
-        uint8_t estadoOld = (estLlamacionesOld>>est) & 1;
-        uint8_t estadoNew = (estLlamaciones>>est) & 1;
-        if (estadoNew && !estadoOld) // empieza a pedir
-            timeInicioPeticion[est] = ahora;
-        if (!estadoNew && estadoOld) // deja de pedir
-        {
-            // registro en memoria permanente
-            uint32_t tiempoOn = ahora - timeInicioPeticion[est];
-//            struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
-//            datos->datosId[est].segundosPeticion += tiempoOn;
-//            datos->datosId[est].numPeticiones += 1;
-        }
-    }
-}
+///*
+// * Registra cambios segun estadoLlamaciones
+// */
+//void radio::registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld)
+//{
+//    time_t ahora = calendar::getSecUnix();
+//    for (uint8_t est=0;est<8;est++)
+//    {
+//        uint8_t estadoOld = (estLlamacionesOld>>est) & 1;
+//        uint8_t estadoNew = (estLlamaciones>>est) & 1;
+//        if (estadoNew && !estadoOld) // empieza a pedir
+//            timeInicioPeticion[est] = ahora;
+//        if (!estadoNew && estadoOld) // deja de pedir
+//        {
+//            // registro en memoria permanente
+//            uint32_t tiempoOn = ahora - timeInicioPeticion[est];
+////            struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+////            datos->datosId[est].segundosPeticion += tiempoOn;
+////            datos->datosId[est].numPeticiones += 1;
+//        }
+//    }
+//}
 
 
 void arrancaRadioC(void)

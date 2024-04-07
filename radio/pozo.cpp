@@ -256,8 +256,6 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
         estadoLlamaciones &= ~(1<<(estacionMsgMenosUno));
     else
         estadoLlamaciones |= (1<<(estacionMsgMenosUno));
-    if (estadoLlamaciones!=estadoLlamacionesOld)
-        radio::registraCambiosPeticion(estadoLlamacionesOld, estadoLlamaciones);  // registra cambios en memoria permanente
     updateEstadoBomba();
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || estadoAbusones!=estadoAbusonesOld
             || estadoBombaOld!=bombaPozoOn)

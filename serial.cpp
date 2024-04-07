@@ -200,7 +200,7 @@ void ajustaVariables(SerialDriver *sdCOM)
     while (1==1)
     {
         chprintf(ttyCOM,"Ajuste variables\n");
-        chprintf(ttyCOM,"1 Modo radio:%d (1:llamador, 2:pozo)\n",modoRadio);
+        chprintf(ttyCOM,"1 Modo radio:%d (1:llamador, 2:pozo, 3:registrador)\n",modoRadio);
         chprintf(ttyCOM,"2 Tiempo olvido:%d s\n",sOlvido);
         if (modoRadio==1)
         {

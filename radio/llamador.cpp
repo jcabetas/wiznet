@@ -173,8 +173,6 @@ uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacio
     {
         numEstadoComOk = estoyConectadoMsg;
     }
-    if (estadoLlamaciones!=estadoLlamacionesOld)
-        radio::registraCambiosPeticion(estadoLlamaciones, estadoLlamacionesOld);  // registra cambios en memoria permanente
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || bombaPozoOn!=petBombaOld)
     {
         return 1;

@@ -41,8 +41,8 @@ event_source_t newMsgRx_source;
 event_source_t newMsgTx_source;
 
 event_source_t rf95int_source;
-thread_t *procesoRf95Int, *procesoRf95rx;
-
+thread_t *procesoRf95Int = NULL;
+thread_t *procesoRf95rx = NULL;
 
 extern uint16_t modoRadio;
 extern llamador *llamadorObj;
@@ -161,6 +161,8 @@ void initSpi3Pins(void)
 
 void initRF95(void)
 {
+    if (procesoRf95Int!=NULL) // debe haber sido arrancado antes
+        return;
     initSpi3Pins();
     spiStart(&SPID3, &spicfgRF95);
     palSetLine(LINE_NSS);
