@@ -32,16 +32,16 @@ extern "C" {
  *
  */
 
-radio *radio::radioPtr = NULL;
-uint8_t radio::estadoLlamaciones = 0;
-uint8_t radio::estadoActivos = 0;
-uint8_t radio::estadoAbusones = 0;
-uint8_t radio::estadoAbusonesOld = 0;
-time_t radio::timeUltConexion[] = {0};
-time_t radio::timeInicioPeticion[] = {0};
-//float radio::totEner = 0.0f;
+//radio *radio::radioPtr = NULL;
+//uint8_t radio::estadoLlamaciones = 0;
+//uint8_t radio::estadoActivos = 0;
+//uint8_t radio::estadoAbusones = 0;
+//uint8_t radio::estadoAbusonesOld = 0;
+//time_t radio::timeUltConexion[] = {0};
+//time_t radio::timeInicioPeticion[] = {0};
+////float radio::totEner = 0.0f;
 
-llamador *llamador::llamadorPtr = NULL;
+//llamador *llamador::llamadorPtr = NULL;
 
 void radio::reseteaVariables(void)
 {
@@ -56,14 +56,7 @@ void radio::reseteaVariables(void)
         timeUltConexion[disp] =  ahora;
     }
     // comprueba coherencia de datos historicos
-    if (radioPtr!=NULL)
-        radioPtr->reseteaVariablesEspecificas();
-}
-
-
-uint8_t radio::radioDefinida(void)
-{
-    return (radioPtr!=NULL);
+    reseteaVariablesEspecificas();
 }
 
 /*
@@ -198,36 +191,37 @@ uint8_t radio::getCntRx(void)
 
 void radio::ponEnColaRegistrador(void)
 {
-    struct cambiosPozo_t estadoPozo;
-    // pon en cola de registrador
-    estadoPozo.timet = calendar::getSecUnix();
-    estadoPozo.estActi = estadoActivos;
-    estadoPozo.estLlam = estadoLlamaciones;
-    estadoPozo.estAbuso = estadoAbusones;
-    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
-//    chMtxLock(&MtxMedidas);
-    estadoPozo.m3Total = datos->m3Total;
-    estadoPozo.kWhPunta = datos->kWhPunta;
-    estadoPozo.kWhValle = datos->kWhValle;
-//    chMtxUnlock(&MtxMedidas);
-    putQueu(&colaCambiosPozo, &estadoPozo);
-    chEvtBroadcast(&registraMsgPozo_source);
+//    struct cambiosPozo_t estadoPozo;
+//    // pon en cola de registrador
+//    estadoPozo.timet = calendar::getSecUnix();
+//    estadoPozo.estActi = estadoActivos;
+//    estadoPozo.estLlam = estadoLlamaciones;
+//    estadoPozo.estAbuso = estadoAbusones;
+//    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+////    chMtxLock(&MtxMedidas);
+//    estadoPozo.m3Total = datos->m3Total;
+//    estadoPozo.kWhPunta = datos->kWhPunta;
+//    estadoPozo.kWhValle = datos->kWhValle;
+////    chMtxUnlock(&MtxMedidas);
+//    putQueu(&colaCambiosPozo, &estadoPozo);
+//    chEvtBroadcast(&registraMsgPozo_source);
 }
+
+extern llamador *llamadorObj;
 
 
 void radio::arrancaRadio(void)
 {
     if (modoRadio==1)
     {
-        if (radioPtr!=NULL)
+        if (llamadorObj!=NULL)
         {
-            chLcdprintfFila(3,"Radio ya arrancada?");
+            chLcdprintfFila(3,"Llamador ya arrancadoa?");
             return;
         }
+        llamadorObj = new llamador();
         chLcdprintfFila(3,"Arranco llamador");
-        llamador::llamadorPtr = new llamador();
-        radioPtr = (radio *) llamador::llamadorPtr;
-        radioPtr->init();
+        llamadorObj->init();
     }
     initRF95();
 }
@@ -261,11 +255,11 @@ void arrancaRadioC(void)
     radio::arrancaRadio();
 }
 
-void radio::obsoleto(void)
-{
-    if (radioPtr)
-        radioPtr->trataObsoleto();
-}
+//void radio::obsoleto(void)
+//{
+//    if (radioPtr)
+//        radioPtr->trataObsoleto();
+//}
 /*
  *  varNUMERO idLlamador(18,8,1,8,"Id Llamador");
     varNUMERO dsMinEntreMsgsLlamador(19,5,2,60,"Tmn Msg Ll ds");

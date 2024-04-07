@@ -65,30 +65,29 @@ class radio
 {
 protected:
     ModoRadio modo;  // modoRadio
-    virtual void trataObsoleto(void) = 0;
     uint16_t bombaPozoOn;                                             // segun mensajes del pozo
     uint16_t numEstadoComOk, numEstadoBomba;
-    static uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
-    static uint8_t estadoAbusonesOld;
-    static time_t timeInicioPeticion[NUMSATELITES];
-    static time_t timeUltConexion[NUMSATELITES];
+    uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
+    uint8_t estadoAbusonesOld;
+    time_t timeInicioPeticion[NUMSATELITES];
+    time_t timeUltConexion[NUMSATELITES];
     uint8_t numErrorAviso[MAXERRORESAVISO];
     uint8_t idEstacionAviso[MAXERRORESAVISO];
     uint8_t mensajeAviso[MAXERRORESAVISO][21];
     time_t timeInicioAvisoError[MAXERRORESAVISO];
     uint8_t cntTx, cntRx;
-    static radio *radioPtr;
 public:
 //    static void apuntaEnergia(float incEner);
 //    static void trataRxRf95Radio(eventmask_t evt);
 //    virtual void trataRxRf95(eventmask_t evt) = 0;
-    virtual void trataRx(struct msgRx_t *msgRx) = 0;
-    virtual uint8_t init(void) = 0;
-    static void obsoleto(void);
+    //radio *radioPtr;
+    uint8_t init(void);
+    void trataRx(struct msgRx_t *msgRx);
+    void obsoleto(void);
 
-    static void reseteaHistoriaPozo(void);
-    static void reseteaVariables(void);
-    virtual void reseteaVariablesEspecificas(void) = 0;
+    void reseteaHistoriaPozo(void);
+    void reseteaVariables(void);
+    void reseteaVariablesEspecificas(void);
     static void arrancaRadio(void);
     static void paraRadio(void);
     static uint8_t radioDefinida(void);
@@ -114,13 +113,12 @@ protected:
     uint16_t dsAleatorioMaxEntreMsgsLlamador;
     struct fechaHora dateTimeEnvioAnterior;
     struct fechaHora dateTimeRxPozoAnterior;
-    void trataObsoleto(void);
 public:
     llamador(void);
     ~llamador();
-    static llamador *llamadorPtr;
+    void obsoleto(void);
+    void trataRx(struct msgRx_t *msgRx);
     void reseteaVariablesEspecificas(void);
-    // para implementar "bloque"
     const char *diNombre(void);
     uint8_t init(void);
     void stop(void);
@@ -132,9 +130,6 @@ public:
     uint8_t limpiaError(uint8_t numEstacion, uint8_t numError);
     void enviaStatusLlamacion(void);
     uint8_t gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg);
-
-
-    void trataRx(struct msgRx_t *msgRx);
 };
 
 

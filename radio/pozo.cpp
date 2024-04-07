@@ -67,7 +67,6 @@ pozo *pozoObj;
 pozo::pozo(void)
 {
     modoRadio = MODOPOZO;
-    radioPtr = this;
     palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
     bombaPozoOn = 0;
     palClearLine(LINE_RELE);
@@ -370,7 +369,7 @@ void pozo::trataRx(struct msgRx_t *msgRx)
 
 pozo::~pozo()
 {
-    radioPtr = NULL;
+
 }
 
 const char *pozo::diTipo(void)

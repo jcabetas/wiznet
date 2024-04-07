@@ -112,7 +112,7 @@ static THD_FUNCTION(trataRf95, p) {
             // hemos recibido algo ? (por si las moscas)
             if (rf95.available())
                 procesaRx();
-            radio::obsoleto();
+//            radio::obsoleto();
 //            switch (modoRadio)
 //            {
 //            case 1:

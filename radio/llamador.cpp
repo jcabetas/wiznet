@@ -53,6 +53,8 @@ thread_t *procesoLlamador = NULL;
 thread_t *procesoSensor = NULL;
 
 
+
+
 extern "C"
 {
     void llamadorInit(void);
@@ -77,7 +79,7 @@ llamador::llamador(void)
     estadoDeseado = 0;
     dsAleatorioMinEntreMsgsLlamador = 2;
     dsAleatorioMaxEntreMsgsLlamador = 6;
-    radioPtr = this;
+    //radioPtr = this;
     estadoComms = 0;
     estadoAbusones = 0;
     estadoAbusonesOld = 0;
@@ -120,7 +122,7 @@ void llamador::enviaStatusLlamacion(void)
 
 
 
-void llamador::trataObsoleto(void)
+void llamador::obsoleto(void)
 {
     // ha pasado mucho tiempo sin recibir?
     if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
@@ -351,6 +353,7 @@ static THD_FUNCTION(ThreadSensor, arg) {
             if (msNuevoEstado > 500)
             {
                 estadoDeseadoSensor = nuevoEstado;
+                chLcdprintfFila(3,"Llamacion:%d",estadoDeseadoSensor);
                 msNuevoEstado = 0;
                 chEvtBroadcast(&sensor_source);
             }
@@ -361,6 +364,7 @@ static THD_FUNCTION(ThreadSensor, arg) {
     }
 }
 
+llamador *llamadorObj;
 
 /*
  * Gestor llamacion
@@ -380,19 +384,20 @@ static THD_FUNCTION(ThreadLlamador, arg) {
             chThdExit((msg_t) 1);
         if (evt == 0)  // timeout
         {
-            radio::obsoleto();
+            llamadorObj->obsoleto();
             continue;
         }
         if (evt == EVENT_MASK(1))  // ha cambiado el sensor, enviamos a cola de transmision
         {
-            llamador::llamadorPtr->update(estadoDeseadoSensor); //enviaStatusLlamacion();
+            llamadorObj->update(estadoDeseadoSensor); //enviaStatusLlamacion();
             continue;
         }
-        if (evt == EVENT_MASK(2))  // he recibido un mensaje que esta en la cola
+        if (evt == EVENT_MASK(2))  // he recibido un mensaje, que esta en la cola
         {
             while (getQueu(&colaMsgRx, &msgRx))
             {
-                llamador::llamadorPtr->trataRx(&msgRx);
+                //llamador::llamadorPtr->trataRx(&msgRx);
+                llamadorObj->trataRx(&msgRx);
             }
         }
     }
