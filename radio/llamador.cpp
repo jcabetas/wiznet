@@ -31,14 +31,13 @@ int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
 extern struct queu_t colaMsgTx;
 extern event_source_t newMsgTx_source;
-extern event_source_t newMsgRx_source;
-
 extern struct queu_t colaMsgRx;
+extern event_source_t newMsgRx_source;
+event_source_t sensor_source;
+extern event_source_t newMsgRx_source;
 
 extern struct msgRx_t ultMsg;
 
-event_source_t sensor_source;
-extern event_source_t newMsgRx_source;
 
 uint8_t estadoDeseadoSensor;
 
@@ -65,7 +64,6 @@ extern "C"
 int32_t randomNum(int32_t numMin, int32_t numMax)
 {
    //srand((unsigned) time(&t));
-
    return numMin + (rand() %(numMax-numMin));
 }
 
@@ -75,16 +73,12 @@ llamador::llamador(void)
     modoRadio = MODOLLAMADOR;
     bombaPozoOn = 0;
     bombaPozoSolicitada = 0;
-    calendar::getFechaHora(&dateTimeEnvioAnterior);
+    calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoDeseado = 0;
     dsAleatorioMinEntreMsgsLlamador = 2;
     dsAleatorioMaxEntreMsgsLlamador = 6;
     //radioPtr = this;
     estadoComms = 0;
-    estadoAbusones = 0;
-    estadoAbusonesOld = 0;
-    cntTx = 0;
-    cntRx = 0;
 }
 
 
@@ -105,6 +99,7 @@ void llamador::reseteaVariablesEspecificas(void)
  */
 void llamador::enviaStatusLlamacion(void)
 {
+    char buffer[25];
     struct msgTx_t msgTx;
     msgTx.numBytes = 3;
     msgTx.msg[0] = MSG_STATUSLLAMACIONLOCAL;
@@ -118,6 +113,8 @@ void llamador::enviaStatusLlamacion(void)
     if (++cntTx>99)
         cntTx = 0;
     calendar::getFechaHora(&dateTimeEnvioAnterior);
+    chsnprintf(buffer,sizeof(buffer),"Envio llamacion:%d",estadoDeseado);
+    escribeLCD(buffer);
 }
 
 
@@ -180,7 +177,6 @@ uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacio
         radio::registraCambiosPeticion(estadoLlamaciones, estadoLlamacionesOld);  // registra cambios en memoria permanente
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || bombaPozoOn!=petBombaOld)
     {
-//        ponEnColaRegistrador();     // guardar en SD
         return 1;
     }
     else
@@ -196,7 +192,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     struct tm fechHora;
     if (++cntRx>99)
         cntRx = 0;
-// Formato del mensaje:
+    // Formato del mensaje:
     //    Byte 0: MSG_STATUSPOZO
     //    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
     //    Byte 2: Estado bomba del Pozo '0' '1'
@@ -215,9 +211,11 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             gestionaEstadoPozo(petBombaMsg, estadoLlamacionesMsg, estadoActivosMsg);
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
-            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
-            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
+            chsnprintf(buffer,sizeof(buffer),"Pozo B:%d RSSI:%d", petBombaMsg, msgRx->rssi);
+            escribeLCD(buffer);
+//            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
+//            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
+//            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
         }
     }
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
@@ -229,10 +227,12 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         {
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             calendar::gettm(&fechHora);
-            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
-            chLcdprintfFila(0,buffer);
-            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
-            chLcdprintfFila(1,buffer);
+            chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEstMsg,petBombaMsg, msgRx->rssi);
+            escribeLCD(buffer);
+//            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
+//            chLcdprintfFila(0,buffer);
+//            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
+//            chLcdprintfFila(1,buffer);
         }
     }
     // Tipo de Mensaje MSG_ERROR. Longitud=variable, de 4 a un maximo de 24 bytes
@@ -264,8 +264,10 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
-            chLcdprintfFila(1,"msg:'%s'",bufError);
+            chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
+            escribeLCD(buffer);
+//            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
+//            chLcdprintfFila(1,"msg:'%s'",bufError);
         }
     }
     // Tipo de Mensaje MSG_CLEARERROR. Longitud=4
@@ -291,8 +293,9 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         if (estadoAbusones != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
-            chLcdprintfFila(0,"%02d:%02d Deja de abusar #%d", fechHora.tm_min, fechHora.tm_sec, estProblematica);
-            chLcdprintfFila(1,"");
+            chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
+            escribeLCD(buffer);
+//            chLcdprintfFila(1,"");
         }
     }
 }

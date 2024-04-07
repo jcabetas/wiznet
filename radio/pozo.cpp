@@ -30,7 +30,7 @@ extern RTCDateTime dateTimeEnvioAnterior;
 extern struct queu_t colaMsgTx;
 extern event_source_t newMsgTx_source;
 extern struct queu_t colaMsgRx;
-
+extern event_source_t newMsgRx_source;
 extern struct msgRx_t ultMsg;
 
 
@@ -51,7 +51,7 @@ extern uint16_t tiempoAbuso;         // minutos
 extern uint16_t dsMaxEntreMsgsPozo;
 extern uint16_t dsMinEntreMsgsPozo;
 
-pozo *pozoObj;
+thread_t *procesoPozo = NULL;
 
 
 /*
@@ -66,6 +66,7 @@ pozo *pozoObj;
 // POZO bOn.radio.pic.0 [dsMin 5] [dsMax 100] [blAbus 1] [tAbus 10] [sOlv 50] pozo.logPozo.txt llam.radio.txt act.radio.txt abu.radio.txt
 pozo::pozo(void)
 {
+    reseteaVariablesEspecificas();
     modoRadio = MODOPOZO;
     palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
     bombaPozoOn = 0;
@@ -77,6 +78,11 @@ void pozo::reseteaVariablesEspecificas(void)
 {
     dsAleatorioMinEntreMsgsPozo= dsMinEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
     dsAleatorioMaxEntreMsgsPozo = dsMaxEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
+    for (uint8_t disp=0;disp<NUMSATELITES;disp++)
+        timeUltConexion[disp] = 0;
+    estadoActivos = 0;
+    estadoAbusones = 0;
+    estadoLlamaciones = 0;
     // errores de Jandro
     // tratamiento de errores de Jandro
     for (int8_t numAviso=0;numAviso<MAXERRORESAVISO;numAviso++)
@@ -130,10 +136,11 @@ uint8_t pozo::quitarAbuso(uint8_t numEstacion)
 void pozo::enviaStatusPozo(void)
 {
     struct msgTx_t msgTx;
+    char buffer[25];
     msgTx.numBytes = 5;
     msgTx.msg[0] = MSG_STATUSPOZO;
     msgTx.msg[1] = 0;                   // Id Pozo
-    if (estadoPeticionBomba()>0)
+    if (bombaPozoOn == 1)
         msgTx.msg[2] = '1';
     else
         msgTx.msg[2] = '0';
@@ -141,7 +148,11 @@ void pozo::enviaStatusPozo(void)
     msgTx.msg[4] = estadoLlamaciones;
     putQueu(&colaMsgTx, &msgTx);
     chEvtBroadcast(&newMsgTx_source);
+    if (++cntTx>99)
+        cntTx = 0;
     calendar::getFechaHora(&dateTimeEnvioAnterior);
+    chsnprintf(buffer,sizeof(buffer),"Envio estado:%d",bombaPozoOn);
+    escribeLCD(buffer);
 }
 
 // Formato del mensaje:
@@ -188,18 +199,18 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
 }
 
 /*
- * ver estado de la bomba atendiendo a los mensajes de llamaciones
+ * actualiza estado de la bomba atendiendo a los mensajes de llamaciones
  */
-uint8_t pozo::estadoPeticionBomba(void)
+void pozo::updateEstadoBomba(void) // estadoPeticionBomba
 {
     if (bloqueoAbusones)
-        return (uint8_t ) ((estadoLlamaciones & ~estadoAbusones)>0);
+        bombaPozoOn = ((estadoLlamaciones & ~estadoAbusones)>0);
     else
-        return (uint8_t ) (estadoLlamaciones>0);
+        bombaPozoOn = (estadoLlamaciones>0);
 }
 
 /*
- *  Trata la recepci�n de petici�n de una estaci�n
+ *  Trata la recepcion de peticion de una estacion
  *  Devuelve 1 si precisa notificar cambios
  */
 uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
@@ -210,7 +221,7 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     estadoLlamacionesOld = estadoLlamaciones;
     estadoActivosOld = estadoActivos;
     estadoAbusonesOld = estadoAbusones;
-    estadoBombaOld = estadoPeticionBomba();
+    estadoBombaOld = bombaPozoOn;
     uint8_t estacionMsgMenosUno = estacionMsg-1;
     time_t ahora = calendar::getSecUnix();
     timeUltConexion[estacionMsgMenosUno] = ahora;
@@ -247,10 +258,10 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
         estadoLlamaciones |= (1<<(estacionMsgMenosUno));
     if (estadoLlamaciones!=estadoLlamacionesOld)
         radio::registraCambiosPeticion(estadoLlamacionesOld, estadoLlamaciones);  // registra cambios en memoria permanente
+    updateEstadoBomba();
     if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || estadoAbusones!=estadoAbusonesOld
-            || estadoBombaOld!=estadoPeticionBomba() || estadoBombaOld!=estadoPeticionBomba())
+            || estadoBombaOld!=bombaPozoOn)
     {
-        bombaPozoOn = estadoPeticionBomba();
         if (bombaPozoOn)
             palSetLine(LINE_RELE);
         else
@@ -264,7 +275,7 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
 /*
  * Nos llaman cada segundo, para comprobar obsolescencias
  */
-void pozo::trataObsoleto(void)
+void pozo::obsoleto(void)
 {
     // llevan mucho tiempo sin conexion?
     uint8_t envioEstado = 0;
@@ -289,7 +300,7 @@ void pozo::trataObsoleto(void)
     }
     if (hayCambios)
     {
-        bombaPozoOn = estadoPeticionBomba();
+        updateEstadoBomba();
         if (bombaPozoOn)
             palSetLine(LINE_RELE);
         else
@@ -313,6 +324,7 @@ void pozo::trataObsoleto(void)
 
 void pozo::trataRx(struct msgRx_t *msgRx)
 {
+    char buffer[30];
     uint8_t msgId = msgRx->msg[0];
     uint8_t petBombaMsg, numEst;
     // siendo el Pozo, no hare nada con mensajes de otro pozo
@@ -321,6 +333,8 @@ void pozo::trataRx(struct msgRx_t *msgRx)
         //nextion::enviaLog(NULL,"Error, varios POZO");
         return;
     }
+    if (++cntRx>99)
+        cntRx = 0;
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
     {
         numEst = msgRx->msg[1];
@@ -334,6 +348,8 @@ void pozo::trataRx(struct msgRx_t *msgRx)
                 enviaStatusPozo();
             }
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
+            chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEst,petBombaMsg, msgRx->rssi);
+            escribeLCD(buffer);
             // TODO enviar a NExtion
 //            chEvtBroadcast(&hayRxParaLCD_source);
         }
@@ -382,20 +398,52 @@ const char *pozo::diNombre(void)
     return "POZO";
 }
 
-uint8_t pozo::init(void)
-{
-    arrancaRadio();
-    return 0;
-}
 
 void pozo::stop(void)
 {
     paraRadio();
 }
 
-void pozoInit(void)
-{
-    pozoObj = new pozo();
-    pozoObj->init();
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pozo *pozoObj;
+
+/*
+ * Gestor pozo
+ */
+static THD_WORKING_AREA(waThreadPozo, 2000);
+static THD_FUNCTION(ThreadPozo, arg) {
+    (void)arg;
+    struct msgRx_t msgRx;
+    event_listener_t el0;
+    chRegSetThreadName("pozo");
+    chEvtRegister(&newMsgRx_source, &el0, 1);
+    while(!chThdShouldTerminateX()) {
+        eventmask_t evt = chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100));
+        if (chThdShouldTerminateX())
+            chThdExit((msg_t) 1);
+        if (evt == 0)  // timeout
+        {
+            pozoObj->obsoleto();
+            continue;
+        }
+        if (evt == EVENT_MASK(1))  // he recibido un mensaje, que esta en la cola
+        {
+            while (getQueu(&colaMsgRx, &msgRx))
+            {
+                pozoObj->trataRx(&msgRx);
+            }
+        }
+    }
 }
 
+
+uint8_t pozo::init(void)
+{
+    modo = Pozo;
+    if (!procesoPozo)
+        procesoPozo = chThdCreateStatic(waThreadPozo, sizeof(waThreadPozo), NORMALPRIO + 7,  ThreadPozo, NULL);
+    return 0;
+}

@@ -25,6 +25,32 @@ extern "C" {
     void arrancaRadioC(void);
 }
 
+radio::radio(void)
+{
+    estadoAbusones = 0;
+    estadoAbusonesOld = 0;
+    cntTx = 0;
+    cntRx = 0;
+    //calendar::getFechaHora(&dateTimeEnvioAnterior);
+    dateTimeEnvioAnterior = {};
+    bombaPozoOn = 0;
+}
+
+void radio::escribeLCD(const char *msgLin3)
+{
+    char binStr[10], statAbuso[6];
+    if (estadoAbusones==0)
+        strncpy(statAbuso,"     ",sizeof(statAbuso));
+    else
+        strncpy(statAbuso,"ABUSO",sizeof(statAbuso));
+    chLcdprintfFila(0,"%2d Bomba:%d %5s",cntRx, bombaPozoOn, statAbuso);
+    int2str(estadoLlamaciones, binStr);
+    chLcdprintfFila(1,"Piden:%s",binStr);
+    int2str(estadoActivos, binStr);
+    chLcdprintfFila(2,"Activ:%s", binStr);
+    chLcdprintfFila(3,msgLin3);
+}
+
 /*
  * RADIO LLAMADOR pideAgua idLlamador dsMinEntreMsgsLlamador dsMaxEntreMsgsLlamador
  * RADIO MONITOR
@@ -208,20 +234,51 @@ void radio::ponEnColaRegistrador(void)
 }
 
 extern llamador *llamadorObj;
-
+extern pozo *pozoObj;
+extern thread_t *procesoLlamador;
+extern thread_t *procesoSensor;
+extern thread_t *procesoPozo;
 
 void radio::arrancaRadio(void)
 {
-    if (modoRadio==1)
+    if (modoRadio==Llamador)
     {
         if (llamadorObj!=NULL)
         {
             chLcdprintfFila(3,"Llamador ya arrancadoa?");
             return;
         }
+        // hay que matar el pozo?
+        if (procesoPozo!=NULL)
+        {
+            chThdTerminate(procesoPozo);
+            chThdWait(procesoPozo);
+            procesoPozo = NULL;
+        }
         llamadorObj = new llamador();
         chLcdprintfFila(3,"Arranco llamador");
         llamadorObj->init();
+    }
+    else if (modoRadio==Pozo)
+    {
+        if (pozoObj!=NULL)
+        {
+            chLcdprintfFila(3,"Pozo ya arrancadoa?");
+            return;
+        }
+        // hay que matar el llamador y sensor?
+        if (procesoLlamador!=NULL)
+        {
+            chThdTerminate(procesoLlamador);
+            chThdTerminate(procesoSensor);
+            chThdWait(procesoLlamador);
+            chThdWait(procesoSensor);
+            procesoLlamador = NULL;
+            procesoSensor = NULL;
+        }
+        pozoObj = new pozo();
+        chLcdprintfFila(3,"Arranco pozo");
+        pozoObj->init();
     }
     initRF95();
 }

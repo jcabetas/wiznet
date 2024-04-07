@@ -56,7 +56,7 @@ struct datosPozoGuardados
 
 typedef enum
 {
-    Llamador = 0,
+    Llamador = 1,
     Pozo,
     Registrador
 } ModoRadio;
@@ -75,12 +75,14 @@ protected:
     uint8_t idEstacionAviso[MAXERRORESAVISO];
     uint8_t mensajeAviso[MAXERRORESAVISO][21];
     time_t timeInicioAvisoError[MAXERRORESAVISO];
+    struct fechaHora dateTimeEnvioAnterior;
     uint8_t cntTx, cntRx;
 public:
 //    static void apuntaEnergia(float incEner);
 //    static void trataRxRf95Radio(eventmask_t evt);
 //    virtual void trataRxRf95(eventmask_t evt) = 0;
     //radio *radioPtr;
+    radio(void);
     uint8_t init(void);
     void trataRx(struct msgRx_t *msgRx);
     void obsoleto(void);
@@ -100,6 +102,7 @@ public:
     uint8_t buscoSlot(uint8_t numError, uint8_t numEstacion, uint8_t *slot);
     void actualizoErrorDesdeLlamador(uint8_t numEstacion, uint8_t numError, uint8_t *msgError);
     uint8_t limpiaError(uint8_t numEstacion, uint8_t numError);
+    void escribeLCD(const char *msgLin3);
 };
 
 
@@ -111,7 +114,6 @@ protected:
     uint8_t  estadoComms;
     uint16_t dsAleatorioMinEntreMsgsLlamador;
     uint16_t dsAleatorioMaxEntreMsgsLlamador;
-    struct fechaHora dateTimeEnvioAnterior;
     struct fechaHora dateTimeRxPozoAnterior;
 public:
     llamador(void);
@@ -137,7 +139,7 @@ public:
 class pozo: public radio
 {
 protected:
-    struct fechaHora dateTimeEnvioAnterior;
+//    struct fechaHora dateTimeEnvioAnterior;
     uint16_t dsAleatorioMinEntreMsgsPozo;
     uint16_t dsAleatorioMaxEntreMsgsPozo;
 public:
@@ -157,7 +159,7 @@ public:
     uint8_t buscoSlot(uint8_t numError, uint8_t numEstacion, uint8_t *slot);
     void actualizoErrorDesdeLlamador(uint8_t numEstacion, uint8_t numError, uint8_t *msgError);
     int8_t actualizoErrorDesdePozo(uint8_t numEstacion);
-
+    void updateEstadoBomba(void);
     void registraCambiosPeticion(uint8_t estLlamaciones, uint8_t estLlamacionesOld);
 
     // pozo:
@@ -166,9 +168,9 @@ public:
     void enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica);
     void reseteaEstadosOld(void);
     uint8_t haCambiadoEstados(void);
-    uint8_t estadoPeticionBomba(void);
+    //uint8_t estadoPeticionBomba(void);
     uint8_t gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg);
-    void trataObsoleto(void);
+    void obsoleto(void);
     void trataRxPozo(struct msgRx_t *msgRx);
     // llamador
     void trataObsoletoLlamador(void);

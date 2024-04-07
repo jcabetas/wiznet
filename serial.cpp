@@ -21,6 +21,7 @@ using namespace chibios_rt;
 #include "variables.h"
 #include "version.h"
 #include "lcd.h"
+#include "radio.h"
 #include "calendarUTC.h"
 
 extern "C" {
@@ -59,7 +60,7 @@ struct opcion_t {             // Structure declaration
     const char descOpcion[];
   };
 
-struct opcion_t opcMR   = { &modoRadio, 1 ,3,     "Modo radio (1:registr, 2:llamador, 3:pozo)"};
+struct opcion_t opcMR   = { &modoRadio, 1 ,3,     "Modo radio (1:llamador, 2:pozo, 3:regist)"};
 struct opcion_t opcSO   = { &sOlvido, 60 ,1200,   "Tiempo olvido (s)"};
 struct opcion_t opcID   = { &idLlamador, 1 ,9,    "Id Llamador"};
 struct opcion_t opcTMLL = { &dsMaxEntreMsgsLlamador, 100 ,3000, "Tiempo max. entre msgs (ds)"};
@@ -235,7 +236,12 @@ void ajustaVariables(SerialDriver *sdCOM)
             if (result != 0 || (result==0 && opcion==9))
                 return;
             if (opcion==1)
+            {
+                ModoRadio mrold = (ModoRadio) modoRadio;
                 ajustaValor(bcCOM, &opcMR);
+                if (modoRadio != mrold)
+                    radio::arrancaRadio();
+            }
             if (opcion==2)
                 ajustaValor(bcCOM, &opcSO);
             if (opcion==3)

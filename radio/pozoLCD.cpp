@@ -15,10 +15,9 @@ using namespace chibios_rt;
 #include "string.h"
 #include "chprintf.h"
 #include <stdio.h>
-#include "../radio/pozo.h"
+#include "radio.h"
 #include "time.h"
 #include "lcd.h"
-#include "tipoVars.h"
 #include "colas.h"
 
 extern thread_t *procesoDisplayPozo;
@@ -34,7 +33,7 @@ extern uint8_t numErrorAviso[MAXERRORESAVISO];
 extern uint8_t idEstacionAviso[MAXERRORESAVISO];
 extern uint8_t mensajeAviso[MAXERRORESAVISO][21];
 
-struct msgRx_t ultMsg;
+extern struct msgRx_t ultMsg;
 
 extern event_source_t qeCursorEvent;
 extern event_source_t qeSwitchEvent;
@@ -47,10 +46,10 @@ extern event_source_t hayMsgParaLCD_source;
 extern uint8_t buffer[20], bufferRx[20]; // debug Modbus
 extern uint16_t bytesReceived;
 
-extern varNOSI hayModbus;
-extern varMODOPOZO modopozo;
-extern varNUMERO idModbusEnergia;
-extern varNUMERO idModbusVariador;
+//extern varNOSI hayModbus;
+//extern varMODOPOZO modopozo;
+//extern varNUMERO idModbusEnergia;
+//extern varNUMERO idModbusVariador;
 extern struct queu_t colaMsgLcd;
 
 //extern float  kWht, kWht0, kWhtOld, kWhp, kWhv;
@@ -72,6 +71,22 @@ extern char proveedor[15];
 int8_t leeNumeroLCD(const char *mensaje,int32_t *numero, int32_t min, int32_t max);
 uint16_t leeSDMHex(uint16_t idModbus, uint8_t function, uint16_t addressReg, int16_t *error);
 void rtcShow(void);
+
+extern uint16_t modoRadio;
+extern uint16_t sOlvido;
+
+//uint16_t idLlamador;
+//uint16_t dsMaxEntreMsgsLlamador;
+//uint16_t dsMinEntreMsgsLlamador;
+//
+//uint16_t bloqueoAbusones;
+//uint16_t avisaAbuso;
+//uint16_t tiempoAbuso;         // minutos
+//uint16_t dsMaxEntreMsgsPozo;
+//uint16_t dsMinEntreMsgsPozo;
+//
+//uint16_t idVacon;
+
 
 void escribeErroresLCD(void)
 {
@@ -99,66 +114,66 @@ void escribeErroresLCD(void)
 
 void escribeMedidasLCD(void)
 {
-    float  kWhtP, kWhpP, kWhvP;
-    float  kWP, VP, presionP, frecuenciaP;
-    float m3;
-
-    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
-    if (datos->seedInicial != SEEDHISTORICO) // cuando esta iniciado
-    {
-        chLcdprintfFila(0,"Datos historicos");
-        chLcdprintfFila(1,"corrompidos");
-        chLcdprintfFila(2,"");
-        chLcdprintfFila(3,"");
-    }
-    chMtxLock(&MtxMedidas);
-    m3 = datos->m3Total;
-    kWhtP = datos->kWhTotal;
-    kWhpP = datos->kWhPunta;
-    kWhvP = datos->kWhValle;
-    kWP = kW;
-    VP = V;
-    frecuenciaP = frecuencia;
-    presionP = presion;
-    chMtxUnlock(&MtxMedidas);
-
-    if (hayModbus.getValorNum() && idModbusEnergia.getValorNum())
-    {
-        if (errorEnergia2)
-        {
-            chLcdprintfFila(0,"Error medida energia");
-            chLcdprintfFila(1,"Q: %.2f m3",m3);
-            chLcdprintfFila(2,"");
-        }
-        else
-        {
-            chLcdprintfFila(0,"%d V      Pot:%5d",(int16_t) VP,(int16_t)kWP);
-            if (kWhtP<=999.9f)
-                chLcdprintfFila(1,"kWh:%5.1f %7.2f m3", kWhtP, m3);
-            else
-                chLcdprintfFila(1,"kWh:%5d %7.2f m3", (uint16_t) kWhtP, m3);
-            if (kWhpP>9999.9f || kWhvP>9999.9f)
-                chLcdprintfFila(2,"P:%8d V:%7d", (uint32_t)kWhpP, (uint32_t)kWhvP);
-            else
-                chLcdprintfFila(2,"P:%8.2f V:%7.2f", kWhpP, kWhvP);
-        }
-    }
-    else
-    {
-        chLcdprintfFila(0,"Sin sensor energia");
-        chLcdprintfFila(1,"Q: %.2f m3",m3);
-        chLcdprintfFila(2,"");
-    }
-
-    if (hayModbus.getValorNum() && idModbusVariador.getValorNum())
-    {
-        if (errorVariador2)
-            chLcdprintfFila(3,"No comunica variador");
-        else
-            chLcdprintfFila(3,"Bar:%6.1f Frec:%6.2f", presionP, frecuenciaP);
-    }
-    else
-        chLcdprintfFila(3,"No comms variador");
+//    float  kWhtP, kWhpP, kWhvP;
+//    float  kWP, VP, presionP, frecuenciaP;
+//    float m3;
+//
+//    struct datosPozoGuardados *datos = (struct datosPozoGuardados *) BKPSRAM_BASE;
+//    if (datos->seedInicial != SEEDHISTORICO) // cuando esta iniciado
+//    {
+//        chLcdprintfFila(0,"Datos historicos");
+//        chLcdprintfFila(1,"corrompidos");
+//        chLcdprintfFila(2,"");
+//        chLcdprintfFila(3,"");
+//    }
+//    chMtxLock(&MtxMedidas);
+//    m3 = datos->m3Total;
+//    kWhtP = datos->kWhTotal;
+//    kWhpP = datos->kWhPunta;
+//    kWhvP = datos->kWhValle;
+//    kWP = kW;
+//    VP = V;
+//    frecuenciaP = frecuencia;
+//    presionP = presion;
+//    chMtxUnlock(&MtxMedidas);
+//
+//    if (hayModbus.getValorNum() && idModbusEnergia.getValorNum())
+//    {
+//        if (errorEnergia2)
+//        {
+//            chLcdprintfFila(0,"Error medida energia");
+//            chLcdprintfFila(1,"Q: %.2f m3",m3);
+//            chLcdprintfFila(2,"");
+//        }
+//        else
+//        {
+//            chLcdprintfFila(0,"%d V      Pot:%5d",(int16_t) VP,(int16_t)kWP);
+//            if (kWhtP<=999.9f)
+//                chLcdprintfFila(1,"kWh:%5.1f %7.2f m3", kWhtP, m3);
+//            else
+//                chLcdprintfFila(1,"kWh:%5d %7.2f m3", (uint16_t) kWhtP, m3);
+//            if (kWhpP>9999.9f || kWhvP>9999.9f)
+//                chLcdprintfFila(2,"P:%8d V:%7d", (uint32_t)kWhpP, (uint32_t)kWhvP);
+//            else
+//                chLcdprintfFila(2,"P:%8.2f V:%7.2f", kWhpP, kWhvP);
+//        }
+//    }
+//    else
+//    {
+//        chLcdprintfFila(0,"Sin sensor energia");
+//        chLcdprintfFila(1,"Q: %.2f m3",m3);
+//        chLcdprintfFila(2,"");
+//    }
+//
+//    if (hayModbus.getValorNum() && idModbusVariador.getValorNum())
+//    {
+//        if (errorVariador2)
+//            chLcdprintfFila(3,"No comunica variador");
+//        else
+//            chLcdprintfFila(3,"Bar:%6.1f Frec:%6.2f", presionP, frecuenciaP);
+//    }
+//    else
+//        chLcdprintfFila(3,"No comms variador");
 }
 
 
@@ -183,7 +198,7 @@ void escriboEstacionLCD(uint8_t numEstacion) //0..7
     chLcdprintfFila(numFila++,"Estac.:%d %11s",numEstacion+1,statConex);
     if (estadoAbuso)
     {
-        if (modopozo.getValorNum()==2) // estamos en modo pozo?
+        if (modoRadio==2) // estamos en modo pozo?
         {
             localtime_r(&timeInicioPeticion[numEstacion],&fechaIni);
             chLcdprintfFila(numFila++,"Abusa %d/%d %d:%d",fechaIni.tm_mday, fechaIni.tm_mon+1,
@@ -320,8 +335,6 @@ static THD_WORKING_AREA(displayPozo_wa,1400);
 static THD_FUNCTION(displayPozo, p) {
   (void)p;
   uint16_t msTimeout;
-  int32_t passwd;
-  int8_t error;
   char buffer[21];
   struct msgLcd_t msgLcd;
   event_listener_t el0, el1, el2, el3, el4;
@@ -401,60 +414,60 @@ static THD_FUNCTION(displayPozo, p) {
           getQueu(&colaMsgLcd, &msgLcd);
           escribeLCD((char *) msgLcd.msg);
       }
-      // presionado cursor, llamamos al menu
-      if (evt & EVENT_MASK(3))
-      {
-        uint8_t contarOld = contar;
-        chEvtUnregister(&hayRxParaLCD_source, &el0);
-        chEvtUnregister(&hayCambiosLCD_source, &el1);
-        chEvtUnregister(&hayMsgParaLCD_source, &el2);
-        chEvtUnregister(&qeSwitchEvent, &el3);
-        chEvtUnregister(&qeCursorEvent, &el4);
-        uint8_t modoAntiguo = modopozo.getValorNum();
-
-        // pide password si no se ha metido en 2 hora
-        time_t ahora = GetTimeUnixSec();
-        if (ahora-dateTimePasswdOk>2*3600)
-        {
-            passwd = 0;
-            error = leeNumeroLCD("Dime password (355)",&passwd,0,999);
-            if (!error && passwd==355)
-                dateTimePasswdOk = GetTimeUnixSec();
-            else
-            {
-                chLcdprintfFila(0,"Password erronea!");
-                chLcdprintfFila(1,"debes esperar");
-                // escribe en log de SD
-                struct msgLog_t msgLog;
-                msgLog.timet = GetTimeUnixSec();
-                chsnprintf(msgLog.msg,sizeof(msgLog.msg),"Intento erroneo de login");
-                putQueu(&colaLog,&msgLog);
-                chEvtBroadcast(&registraLog_source);
-                chThdSleepMilliseconds(10000);
-            }
-        }
-        if (ahora-dateTimePasswdOk<2*3600)
-            menu();
-        if (modoAntiguo != modopozo.getValorNum())
-            reseteaVariables();
-        contar = contarOld;
-        contarMin = 0;
-        contarMax = 12; //
-        msTimeout = 0;
-        chEvtRegister(&hayRxParaLCD_source, &el0, 0);
-        chEvtRegister(&hayCambiosLCD_source, &el1,1);
-        chEvtRegister(&hayMsgParaLCD_source, &el2,2);
-        chEvtRegister(&qeSwitchEvent, &el3, 3);
-        chEvtRegister(&qeCursorEvent, &el4, 4);
-        escribeLCD("");
-      }
-      // girado cursor, simplemente reiniciamos temporizador
-      if (evt & EVENT_MASK(5))
-      {
-          msTimeout = 0;
-          if (contar==0)
-              escribeLCD(""); // mensajes
-      }
+//      // presionado cursor, llamamos al menu
+//      if (evt & EVENT_MASK(3))
+//      {
+//        uint8_t contarOld = contar;
+//        chEvtUnregister(&hayRxParaLCD_source, &el0);
+//        chEvtUnregister(&hayCambiosLCD_source, &el1);
+//        chEvtUnregister(&hayMsgParaLCD_source, &el2);
+//        chEvtUnregister(&qeSwitchEvent, &el3);
+//        chEvtUnregister(&qeCursorEvent, &el4);
+//        uint8_t modoAntiguo = modopozo.getValorNum();
+//
+//        // pide password si no se ha metido en 2 hora
+//        time_t ahora = GetTimeUnixSec();
+//        if (ahora-dateTimePasswdOk>2*3600)
+//        {
+//            passwd = 0;
+//            error = leeNumeroLCD("Dime password (355)",&passwd,0,999);
+//            if (!error && passwd==355)
+//                dateTimePasswdOk = GetTimeUnixSec();
+//            else
+//            {
+//                chLcdprintfFila(0,"Password erronea!");
+//                chLcdprintfFila(1,"debes esperar");
+//                // escribe en log de SD
+//                struct msgLog_t msgLog;
+//                msgLog.timet = GetTimeUnixSec();
+//                chsnprintf(msgLog.msg,sizeof(msgLog.msg),"Intento erroneo de login");
+//                putQueu(&colaLog,&msgLog);
+//                chEvtBroadcast(&registraLog_source);
+//                chThdSleepMilliseconds(10000);
+//            }
+//        }
+//        if (ahora-dateTimePasswdOk<2*3600)
+//            menu();
+//        if (modoAntiguo != modopozo.getValorNum())
+//            reseteaVariables();
+//        contar = contarOld;
+//        contarMin = 0;
+//        contarMax = 12; //
+//        msTimeout = 0;
+//        chEvtRegister(&hayRxParaLCD_source, &el0, 0);
+//        chEvtRegister(&hayCambiosLCD_source, &el1,1);
+//        chEvtRegister(&hayMsgParaLCD_source, &el2,2);
+//        chEvtRegister(&qeSwitchEvent, &el3, 3);
+//        chEvtRegister(&qeCursorEvent, &el4, 4);
+//        escribeLCD("");
+//      }
+//      // girado cursor, simplemente reiniciamos temporizador
+//      if (evt & EVENT_MASK(5))
+//      {
+//          msTimeout = 0;
+//          if (contar==0)
+//              escribeLCD(""); // mensajes
+//      }
   } while (1==1);
 }
 
