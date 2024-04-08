@@ -309,18 +309,19 @@ void modbus::print(void)
 float medidaV;
 float frecuencia;
 
-
+sdm120ct *medflexo;
+vacon *inversorRiba;
 
 void testMB(void)
 {
     modbus *modbusObj = new modbus(9600);
 
-    sdm120ct *medflexo = new sdm120ct("flexo",2);
-    medflexo->attachMedida(&medidaV, "V", 10, "tension flexo");
+    medflexo = new sdm120ct("flexo",2);
+//    medflexo->attachMedida(&medidaV, "V", 10, "tension flexo");
 //    modbusObj->addDisp(medflexo);
 
-    vacon *inversorRiba = new vacon("inversor");
-    inversorRiba->attachMedida(&frecuencia, "Hz", 50, "Frecuencia");
+    inversorRiba = new vacon("inversor");
+    //inversorRiba->attachMedida(&frecuencia, "Hz", 50, "Frecuencia");
 //    modbusObj->addDisp(inversorRiba);
 
     modbusObj->init();

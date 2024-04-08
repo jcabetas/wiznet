@@ -135,7 +135,7 @@ uint8_t vacon::attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t ds
     return 0;
 }
 
-void vacon::leer(float *valor, uint8_t tipMedida, int16_t *error)
+void vacon::leer(uint16_t *valorInt, uint16_t addressReg, int16_t *error)
 {
     uint16_t bytesReceived;
     uint16_t msgCRC, rxCRC;
@@ -157,8 +157,7 @@ void vacon::leer(float *valor, uint8_t tipMedida, int16_t *error)
     Error Check Low 71
     Error Check High CB
      */
-    uint16_t addressReg = addressVacon[tipMedida];
-    buffer[0] = direccion;
+    buffer[0] = idVacon;
     buffer[1] = 0x04;
     buffer[2] = (addressReg&0xFF00)>>8;
     buffer[3] = addressReg&0xFF;
@@ -170,12 +169,12 @@ void vacon::leer(float *valor, uint8_t tipMedida, int16_t *error)
     buffer[7] = (msgCRC & 0xFF00) >>8;
     bufferRx[0] = 0;
     bufferRx[1] = 0;
-    modbus::chprintStrRs485(buffer, 8, chTimeMS2I(100));
-    *error = modbus::chReadStrRs485(bufferRx, 9, &bytesReceived, chTimeMS2I(100));
+    modbus::chprintStrRs485(buffer, 6, chTimeMS2I(100));
+    *error = modbus::chReadStrRs485(bufferRx, 7, &bytesReceived, chTimeMS2I(100));
     if (*error!=0 || bytesReceived!=9)
     {
         *error = -1;
-        *valor = 0.0f;
+        *valorInt = 0;
         chLcdprintfFila(2,"Error modbus vacon");
         return;
     }
@@ -184,15 +183,24 @@ void vacon::leer(float *valor, uint8_t tipMedida, int16_t *error)
     if (msgCRC!=rxCRC || direccion!= bufferRx[0] || bufferRx[1]!=0x04)
     {
         *error = -2;
-        *valor = 0.0f;
+        *valorInt = 0;
         return;
     }
     // en 3 y 4 esta el valor entero
-    uint16_t valorInt = (bufferRx[3]<<8) + bufferRx[4];
-    *valor = valorInt*escalaVacon[tipMedida];
+    *valorInt = (bufferRx[3]<<8) + bufferRx[4];
     *error = 0;
     return;
 }
+
+void vacon::leerTip(float *valor, uint8_t tipMedida, int16_t *error)
+{
+    uint16_t valorInt;
+    uint16_t addressReg = addressVacon[tipMedida];
+    leer(&valorInt, addressReg, error);
+    *valor = valorInt*escalaVacon[tipMedida];
+}
+
+
 
 // retorna 1 si hay error
 // mejor: 0: no error, 1: error, 2: no se ha usado
@@ -213,13 +221,13 @@ uint8_t vacon::usaBus(void)
         if (dsDesdeUpdate[m-1] >= dsUpdateMaxMed[m-1])
         {
             uint8_t tip = tipoMed[m-1];
-            leer(&valor, tip, &error);
+            leerTip(&valor, tip, &error);
             heEnviado = 1;
             if (error!=0)
             {
                 erroresSeguidos++;
                 // vuelve a intentarlo
-                leer(&valor, tip, &error);
+                leerTip(&valor, tip, &error);
                 if (error!=0)
                 {
                     erroresSeguidos++;

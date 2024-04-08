@@ -23,6 +23,7 @@ using namespace chibios_rt;
 #include "lcd.h"
 #include "radio.h"
 #include "calendarUTC.h"
+#include "modbus.h"
 
 extern "C" {
     void initHM10(void);
@@ -287,6 +288,40 @@ uint8_t cambiaNombreModulo(SerialDriver *sdCOM)
     return 1;
 }
 
+extern vacon *inversorRiba;
+
+void testVacon(SerialDriver *sdCOM)
+{
+    uint8_t huboTimeout;
+    uint16_t addr, valor;
+    int16_t error;
+    char buffer[15];
+    BaseSequentialStream *ttyCOM = (BaseSequentialStream *) sdCOM;
+    chprintf(ttyCOM,"Prueba inversor Vacon\n");
+    chprintf(ttyCOM,"(en 2102 frecuencia)\n");
+    do
+    {
+        chprintf(ttyCOM,"Addres? (0 salir)");
+        chgetsNoEchoTimeOut((BaseChannel *) sdCOM, (uint8_t *) buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
+        chprintf(ttyCOM,"\n");
+        if (huboTimeout)
+        {
+            chprintf(ttyCOM,"Timeout, salimos...\n");
+            return;
+        }
+        addr = atoi(buffer);
+        if (addr == 0)
+            return;
+        //void vacon::leer(uint16_t *valorInt, uint16_t addressReg, int16_t *error)
+        inversorRiba->leer(&valor,addr,&error);
+        if (error!=0)
+        {
+            chprintf(ttyCOM,"Error %d\n",error);
+            continue;
+        }
+        chprintf(ttyCOM,"Valor:%d\n",valor);
+    } while (true);
+}
 
 
 //struct opcion_t opcMR   = { &modoRadio, 1 ,2,     "Modo radio (1:llamador, 2:pozo)"};
@@ -343,17 +378,19 @@ static THD_FUNCTION(ThreadHM10, arg) {
         {
             printOpcion(ttyOpciones, &opcBLQ);
             printOpcion(ttyOpciones, &opcAVS);
-            printOpcion(ttyOpciones, &opcTAB);            printOpcion(ttyOpciones, &opcID);
+            printOpcion(ttyOpciones, &opcTAB);
+            printOpcion(ttyOpciones, &opcID);
             printOpcion(ttyOpciones, &opcTMPZ);
             printOpcion(ttyOpciones, &opcTmPZ);
         }
         chprintf(ttyOpciones,"\n");
         chprintf(ttyOpciones,"1 Ajusta variables\n");
         chprintf(ttyOpciones,"2 Ajusta fecha\n");
-        chprintf(ttyOpciones,"3 Cambiar nombre modulo\n");
+        chprintf(ttyOpciones,"3 Test vacon\n");
+        chprintf(ttyOpciones,"4 Cambiar nombre modulo\n");
 
         limpiaBuffer((BaseChannel *) ttyHM10); // por si esta conectado HM-10 y da mensajes de error
-        result = preguntaNumeroHM10((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 3);
+        result = preguntaNumeroHM10((BaseChannel *) ttyHM10, "Dime opcion", &opcion, 1, 4);
         chprintf(ttyOpciones,"\n");
         if (result != 0)
             continue;
@@ -363,6 +400,8 @@ static THD_FUNCTION(ThreadHM10, arg) {
             ajustaHora(ttyHM10);
         if (opcion==3)
             cambiaNombreModulo(ttyHM10);
+        if (opcion==4)
+            testVacon(ttyHM10);
     }
 }
 

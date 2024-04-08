@@ -130,7 +130,8 @@ public:
     uint8_t attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t dsUpdatePar, const char *descrPar);
     void changeID(uint8_t oldId, uint8_t newId, int16_t *error);
     uint8_t usaBus(void);
-    void leer(float *valor, uint8_t tipMedida, int16_t *error);
+    void leer(uint16_t *valorInt, uint16_t addressReg, int16_t *error);
+    void leerTip(float *valor, uint8_t tipMedida, int16_t *error);
     uint16_t diDir(void);
     const char *diTipo(void);
     char *diNombre(void);
