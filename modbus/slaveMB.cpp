@@ -42,7 +42,7 @@ holdingRegisterInt *sMaxEntreMsgsLlamadorHR; // s maximo entre mensajes en modo 
 holdingRegisterInt *dsMinEntreMsgsLlamadorHR; // ds minimo entre mensajes en modo llamador
 holdingRegisterInt *bloqueaAbusonesHR; // 0 no,1 bloqueo abusones
 holdingRegisterInt *minutosAbusoHR;   //
-holdingRegisterInt *dsMaxEntreMsgsPozoHR; // ds maximo entre mensajes en modo pozo
+holdingRegisterInt *sMaxEntreMsgsPozoHR;  // s maximo entre mensajes en modo pozo
 holdingRegisterInt *dsMinEntreMsgsPozoHR; // ds minimo entre mensajes en modo pozo
 holdingRegisterFloat *barMaxSensPresionHR;     // *10
 holdingRegisterInt *pideAguaHR;           // pide agua
@@ -50,7 +50,7 @@ holdingRegisterInt *pideAguaHR;           // pide agua
 void initHoldingRegistersControl(modbusSlave *modbusControl)
 {
    // comunes
-   modbusIdHR = modbusControl->addHoldingRegisterInt("IdMB", 2, 127, 2, true);
+   modbusIdHR = modbusControl->addHoldingRegisterInt("IdMB", 1, 127, 2, true);
    modbusBaudHR = modbusControl->addHoldingRegisterInt2Ext("baud MB",modbusSpeed,10, 9600, true);
    modoRadioHR =  modbusControl->addHoldingRegisterOpciones("modo radio",modoStr,3, 0, true);
    sTimeOutLlamadoresHR =  modbusControl->addHoldingRegisterInt("Tiempo olvido (s)", 30, 36000, 120, true);  // timeout para que el satelite se considere desconectado
@@ -60,9 +60,9 @@ void initHoldingRegistersControl(modbusSlave *modbusControl)
    dsMinEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T intermsg (ds)", 5, 100, 30, true);  // tiempo minimo llamadores entre mensajes
    bloqueaAbusonesHR = modbusControl->addHoldingRegisterInt("Bloquea abuso", 0, 1, 1, true);
    minutosAbusoHR = modbusControl->addHoldingRegisterInt("Abuso minutos", 30, 1440, 720, true);
-   dsMaxEntreMsgsPozoHR = modbusControl->addHoldingRegisterInt("T refresco pozo (ds)", 100, 36000,200, true); // tiempo maximo pozo sin enviar estados
+   sMaxEntreMsgsPozoHR = modbusControl->addHoldingRegisterInt("T refresco pozo (s)", 5, 180,5, true); // tiempo maximo pozo sin enviar estados
    dsMinEntreMsgsPozoHR = modbusControl->addHoldingRegisterInt("T interrmsg pozo (ds)", 5, 100, 20, true);    // tiempo minimo pozo entre estados
-   barMaxSensPresionHR = modbusControl->addHoldingRegisterFloat("Bar max sensor*10", 1.0, 16.0, 8.0, 0.1f, true);
+   barMaxSensPresionHR = modbusControl->addHoldingRegisterFloat("Bar max sensor*10", 1.0, 16.0, 8.0, 10.0f, true);
    pideAguaHR = modbusControl->addHoldingRegisterInt("Llamacion MB", 0, 1, 0, false);
 }
 

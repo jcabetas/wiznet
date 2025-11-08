@@ -80,7 +80,8 @@ llamador::llamador(void)
     bombaPozoSolicitada = 0;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoDeseado = 0;
-//    dsAleatorioMinEntreMsgsLlamador = randomNum(dsMinEntreMsgsLlamadorHR->getValor(),dsMaxEntreMsgsLlamador);
+    //dsAleatorioMinEntreMsgsLlamador = randomNum(dsMinEntreMsgsLlamadorHR->getValor(),dsMaxEntreMsgsLlamador);
+    dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamadorHR->getValor()+randomNum(0,10);
 //    sAleatorioBacon = sBeacon + randomNum(0,10);
     estadoComms = 0;
 }
@@ -357,7 +358,7 @@ static THD_FUNCTION(ThreadSensor, arg) {
     nuevoEstado = !palReadLine(LINE_SENSOR);
     msNuevoEstado = 0;
     while(!chThdShouldTerminateX()) {
-        nuevoEstado = !palReadLine(LINE_SENSOR);
+        nuevoEstado = pideAguaHR->getValor(); //!palReadLine(LINE_SENSOR);
         if (nuevoEstado != estadoDeseadoSensor)
         {
             msNuevoEstado += 100;
@@ -407,7 +408,6 @@ static THD_FUNCTION(ThreadLlamador, arg) {
         {
             while (getQueu(&colaMsgRx, &msgRx))
             {
-                //llamador::llamadorPtr->trataRx(&msgRx);
                 llamadorObj->trataRx(&msgRx);
             }
         }

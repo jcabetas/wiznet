@@ -31,19 +31,11 @@ using namespace chibios_rt;
 //time_t GetTimeUnixSec(void);
 int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
-extern struct queu_t colaMsgTx;
-extern event_source_t newMsgTx_source;
 extern struct queu_t colaMsgRx;
 extern event_source_t newMsgRx_source;
 extern event_source_t newMsgRx_source;
 
 extern struct msgRx_t ultMsg;
-
-extern uint16_t modoRadio;
-extern uint16_t sBeacon;
-extern uint16_t dsMaxEntreMsgsLlamador;
-extern uint16_t dsMinEntreMsgsLlamador;
-
 
 thread_t *procesoRegistrador = NULL;
 
@@ -55,7 +47,6 @@ extern "C"
 
 registrador::registrador(void)
 {
-    modoRadio = Registrador;
     bombaPozoOn = 0;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoComms = 0;
@@ -67,7 +58,7 @@ registrador::registrador(void)
 void registrador::obsoleto(void)
 {
     // ha pasado mucho tiempo sin recibir?
-    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sBeacon)
+    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sTimeOutLlamadoresHR->getValor())
     {
         numEstadoComOk = 0;
     }
@@ -128,6 +119,8 @@ void registrador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Pozo B:%d RSSI:%d", petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  Pozo Bomba:%d RSSI:%d\n",buffer, petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
 //            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
@@ -144,6 +137,8 @@ void registrador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEstMsg,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  #%d Llamacion:%d RSSI:%d\n",buffer,numEstMsg,petBombaMsg, msgRx->rssi);
 //            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
 //            chLcdprintfFila(0,buffer);
 //            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
@@ -181,6 +176,7 @@ void registrador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
             escribeLCD(buffer);
+            chprintf((BaseSequentialStream *)&SD1,"%d Abusa #%d msg:'%s'\n",calendar::getSecUnix(),estProblematica,bufError);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
 //            chLcdprintfFila(1,"msg:'%s'",bufError);
         }
@@ -210,6 +206,7 @@ void registrador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
             escribeLCD(buffer);
+            chprintf((BaseSequentialStream *)&SD1,"%d Deja de abusar #%d\n", calendar::getSecUnix(),estProblematica);
 //            chLcdprintfFila(1,"");
         }
     }

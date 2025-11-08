@@ -138,7 +138,7 @@ class pozo: public radio
 protected:
 //    struct fechaHora dateTimeEnvioAnterior;
     uint16_t dsAleatorioMinEntreMsgsPozo;
-    uint16_t dsAleatorioMaxEntreMsgsPozo;
+    uint16_t sAleatorioMaxEntreMsgsPozo;
 public:
     pozo(void);
     ~pozo();

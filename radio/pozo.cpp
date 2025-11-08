@@ -65,13 +65,7 @@ void int2str(uint8_t valor, char *string);
  *
  */
 
-extern uint16_t modoRadio;
-extern uint16_t sBeacon;
-extern uint16_t bloqueoAbusones;
-extern uint16_t avisaAbuso;
-extern uint16_t tiempoAbuso;         // minutos
-extern uint16_t dsMaxEntreMsgsPozo;
-extern uint16_t dsMinEntreMsgsPozo;
+
 
 thread_t *procesoPozo = NULL;
 
@@ -89,7 +83,6 @@ thread_t *procesoPozo = NULL;
 pozo::pozo(void)
 {
     reseteaVariablesEspecificas();
-    modoRadio = MODOPOZO;
     palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
     bombaPozoOn = 0;
     palClearLine(LINE_RELE);
@@ -98,8 +91,8 @@ pozo::pozo(void)
 
 void pozo::reseteaVariablesEspecificas(void)
 {
-    dsAleatorioMinEntreMsgsPozo= dsMinEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
-    dsAleatorioMaxEntreMsgsPozo = dsMaxEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
+    dsAleatorioMinEntreMsgsPozo = dsMinEntreMsgsPozoHR->getValor() + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
+    sAleatorioMaxEntreMsgsPozo = sMaxEntreMsgsPozoHR->getValor() + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
         timeUltConexion[disp] = 0;
     activosIR->setValor(0);
@@ -145,7 +138,8 @@ int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
 uint8_t pozo::quitarAbuso(uint8_t numEstacion)
 {
     time_t ahora;
-    if (numEstacion==0 || numEstacion>8 || modoRadio!=MODOPOZO)
+    char buffer[30];
+    if (numEstacion==0 || numEstacion>8 || modoRadioHR->getValor()!=1)
         return 1;
     uint16_t estAbus = abusonesIR->getValor();
     estAbus &=  ~(1<<(numEstacion-1));  // si abusaba, ya no
@@ -154,6 +148,8 @@ uint8_t pozo::quitarAbuso(uint8_t numEstacion)
     limpiaError(numEstacion, 1);
     ahora = GetTimeUnixSec();
     timeInicioPeticion[numEstacion-1] =  ahora; // reinicio temporizador
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"%s  #%d le quito abuso\n",buffer,numEstacion);
     return 0;
 }
 
@@ -177,6 +173,8 @@ void pozo::enviaStatusPozo(void)
     calendar::getFechaHora(&dateTimeEnvioAnterior);
     chsnprintf(buffer,sizeof(buffer),"Envio estado:%d",bombaPozoOn);
     escribeLCD(buffer);
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"%s  Envio estado\n",buffer);
 }
 
 // Formato del mensaje:
@@ -227,7 +225,7 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
  */
 void pozo::updateEstadoBomba(void) // estadoPeticionBomba
 {
-    if (bloqueoAbusones)
+    if (bloqueaAbusonesHR->getValor())
         bombaPozoOn = ((peticionesIR->getValor() & ~abusonesIR->getValor())>0);
     else
         bombaPozoOn = (peticionesIR->getValor()>0);
@@ -252,21 +250,21 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     activosIR->setValor(activosIR->getValor() | (1<<estacionMsgMenosUno)); //    estadoActivos |= (1<<estacionMsgMenosUno);
     uint8_t estabaPidiendo = (peticionesIR->getValor()>>estacionMsgMenosUno) & 1;
     uint8_t estabaAbusando = (abusonesIR->getValor()>>estacionMsgMenosUno) & 1;
-    if (!bloqueoAbusones && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
+    if (!bloqueaAbusonesHR->getValor() && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
     {
         abusonesIR->setValor(abusonesIR->getValor() & ~(1<<estacionMsgMenosUno));  // si abusaba, ya no
         enviaClearErrorPozo(1, estacionMsg);
         limpiaError(estacionMsg, 1);
     }
     // posible abuso?
-    if (bloqueoAbusones && !estabaAbusando && estabaPidiendo && petBombaMsg
-            && (ahora-timeInicioPeticion[estacionMsgMenosUno]>tiempoAbuso))
+    if (bloqueaAbusonesHR->getValor() && !estabaAbusando && estabaPidiendo && petBombaMsg
+            && (ahora-timeInicioPeticion[estacionMsgMenosUno]>60*minutosAbusoHR->getValor()))
     {
         abusonesIR->setValor(abusonesIR->getValor() | (1<<estacionMsgMenosUno));
         uint8_t slot = actualizoErrorDesdePozo(estacionMsg);
         enviaErrorPozo(slot);
-        if (avisaAbuso && bloqueoAbusones)
-        {
+//        if (avisaAbuso && bloqueaAbusonesHR->getValor())
+//        {
             // ToDo avisa abuso por SMS
 //            localtime_r(&timeInicioPeticion[estacionMsg],&fechaIni);
 //            devuelveTlfyNombre(estacionMsg, (char *) telef, sizeof(telef), nombre, sizeof(nombre));
@@ -274,7 +272,7 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
 //            chsnprintf(pendienteSMS,sizeof(pendienteSMS),"%s [#%d] lleva pidiendo agua desde %d/%d %d:%2d\nNo considero su llamacion",
 //                       nombre, estacionMsg, fechaIni.tm_mday, fechaIni.tm_mon+1, fechaIni.tm_hour, fechaIni.tm_min);
 //            chEvtBroadcast(&enviarSMS_source);
-        }
+//        }
     }
     if (petBombaMsg==0)
         peticionesIR->setValor(peticionesIR->getValor() & ~(1<<(estacionMsgMenosUno)));
@@ -302,22 +300,25 @@ void pozo::obsoleto(void)
     // llevan mucho tiempo sin conexion?
     uint8_t envioEstado = 0;
     uint8_t hayCambios = 0;
+    char buffer[30];
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
     {
         uint8_t estabaActivo = (activosIR->getValor()>>disp) & 1;
-        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sBeacon)
+        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sTimeOutLlamadoresHR->getValor())
         {
             activosIR->setValor(activosIR->getValor() & ~(1<<disp));
             abusonesIR->setValor(abusonesIR->getValor() & ~(1<<disp));
             peticionesIR->setValor(peticionesIR->getValor() & ~(1<<disp));
             envioEstado = 1;
             hayCambios = 1;
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  #%d sin mensajes desde %d segundos\n",buffer,disp,calendar::sDiff(&timeUltConexion[disp]));
         }
     }
     if (envioEstado==0)  // hace mucho tiempo que no envio nada?
     {
-        uint32_t dsDif = calendar::dsDiff(&dateTimeEnvioAnterior);
-        if (dsDif>dsMaxEntreMsgsPozo)
+        uint32_t sDif = calendar::sDiff(&dateTimeEnvioAnterior);
+        if (sDif>sMaxEntreMsgsPozoHR->getValor())
             envioEstado = 1;
     }
     if (hayCambios)
@@ -372,6 +373,8 @@ void pozo::trataRx(struct msgRx_t *msgRx)
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEst,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  #%d Llam:%d RSSI:%d\n",buffer,numEst,petBombaMsg, msgRx->rssi);
         }
     }
 }

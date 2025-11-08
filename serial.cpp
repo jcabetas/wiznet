@@ -315,6 +315,39 @@ uint8_t cambiaNombreModulo(SerialDriver *sdCOM)
 }
 
 
+void configHardware(void)
+{
+    int16_t result;
+    uint32_t opcion;
+    BaseSequentialStream *bssHM10 = (BaseSequentialStream *) ttyHM10;
+    BaseChannel *bcHM10 = (BaseChannel *) ttyHM10;
+    while(true)
+    {
+        chprintf(bssHM10,"1 Nombre modulo\n");
+        chprintf(bssHM10,"2 Id Modbus:%d\n",modbusIdHR->getValor());
+        chprintf(bssHM10,"3 Baud Modbus:%d\n",modbusBaudHR->getValor());
+        chprintf(bssHM10,"4 Bar max. sensor: %.1f\n",barMaxSensPresionHR->getValor());
+        chprintf(bssHM10,"5 Llamacion: %d\n",pideAguaHR->getValor());
+        chprintf(bssHM10,"6 salir\n");
+        result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 6);
+        chprintf(bssHM10,"\n");
+        if (result != 0 || (result==0 && opcion==6))
+            break;
+        if (opcion==1)
+            cambiaNombreModulo(ttyHM10);
+        if (opcion==2)
+            ajustaNumero(ttyHM10, modbusIdHR);
+        if (opcion==3)
+            ajustaSeleccionInt2Ext(ttyHM10, modbusBaudHR);
+        if (opcion==4)
+            ajustaNumeroFloat(ttyHM10, barMaxSensPresionHR);
+        if (opcion==5)
+            ajustaNumero(ttyHM10, pideAguaHR);
+    }
+}
+
+
+
 static THD_WORKING_AREA(waThreadHM10, 1024);
 static THD_FUNCTION(ThreadHM10, arg) {
     (void)arg;
@@ -351,22 +384,20 @@ static THD_FUNCTION(ThreadHM10, arg) {
         chprintf(bssHM10,"Abuso:%s\n",binStr);
         printHROpciones(bssHM10,modoRadioHR);// printOpcion(ttyOpciones, &opcMR);
         chprintf(bssHM10,"Presion:%.1f\n",presion);
-        chprintf(bssHM10,"Ajuste variables\n");
-        chprintf(bssHM10,"1 Nombre modulo\n");
+        chprintf(bssHM10,"1 Configurar hardware\n");
         chprintf(bssHM10,"2 Modo radio:%s\n",modoRadioHR->getDescripcion());
         if (modoRadioHR->getValor()==0)
         {
-            chprintf(bssHM10,"3 T olvido llamador:%d s\n",sTimeOutLlamadoresHR->getValor());
-            chprintf(bssHM10,"4 Id Llamador: %d\n",idLlamadorHR->getValor());
-            chprintf(bssHM10,"5 Tiempo max entre msgs: %d s\n",sMaxEntreMsgsLlamadorHR->getValor());
-            chprintf(bssHM10,"6 Tiempo min entre msgs: %d ds\n",dsMinEntreMsgsLlamadorHR->getValor());
-            chprintf(bssHM10,"7 salir\n");
-            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 7);
+            chprintf(bssHM10,"3 Id Llamador: %d\n",idLlamadorHR->getValor());
+            chprintf(bssHM10,"4 Tiempo max entre msgs: %d s\n",sMaxEntreMsgsLlamadorHR->getValor());
+            chprintf(bssHM10,"5 Tiempo min entre msgs: %d ds\n",dsMinEntreMsgsLlamadorHR->getValor());
+            chprintf(bssHM10,"6 salir\n");
+            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 6);
             chprintf(bssHM10,"\n");
-            if (result != 0 || (result==0 && opcion==7))
+            if (result != 0 || (result==0 && opcion==6))
                 continue;
             if (opcion==1)
-                cambiaNombreModulo(ttyHM10);
+                configHardware();
             if (opcion==2)
             {
                 uint16_t mrold = modoRadioHR->getValor();
@@ -375,12 +406,10 @@ static THD_FUNCTION(ThreadHM10, arg) {
                     radio::arrancaRadio();
             }
             if (opcion==3)
-                ajustaNumero(ttyHM10, sTimeOutLlamadoresHR);
-            if (opcion==4)
                 ajustaNumero(ttyHM10, idLlamadorHR);
-            if (opcion==5)
+            if (opcion==4)
                 ajustaNumero(ttyHM10, sMaxEntreMsgsLlamadorHR);
-            if (opcion==6)
+            if (opcion==5)
                 ajustaNumero(ttyHM10, dsMinEntreMsgsLlamadorHR);
         }
         else if (modoRadioHR->getValor()==1)
@@ -388,15 +417,14 @@ static THD_FUNCTION(ThreadHM10, arg) {
             chprintf(bssHM10,"3 T olvido llamador:%d s\n",sTimeOutLlamadoresHR->getValor());
             chprintf(bssHM10,"4 Bloqueo abusones: %d\n",bloqueaAbusonesHR->getValor());
             chprintf(bssHM10,"5 Tiempo abuso: %d min\n",minutosAbusoHR->getValor());
-            chprintf(bssHM10,"6 Tiempo max entre msgs: %d (ds)\n",dsMaxEntreMsgsPozoHR->getValor());
-            chprintf(bssHM10,"7 Tiempo min entre msgs: %d (ds)\n",dsMinEntreMsgsPozoHR->getValor());
-            chprintf(bssHM10,"8 Pres. max sensor: %.1f\n",0.1f*barMaxSensPresionHR->getValor());
-            chprintf(bssHM10,"9 salir\n");
-            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 9);
-            if (result != 0 || (result==0 && opcion==9))
+            chprintf(bssHM10,"6 Tiempo max entre msgs: %d s\n",sMaxEntreMsgsPozoHR->getValor());
+            chprintf(bssHM10,"7 Tiempo min entre msgs: %d ds\n",dsMinEntreMsgsPozoHR->getValor());
+            chprintf(bssHM10,"8 salir\n");
+            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 8);
+            if (result != 0 || (result==0 && opcion==8))
                 continue;
             if (opcion==1)
-                cambiaNombreModulo(ttyHM10);
+                configHardware();
             if (opcion==2)
             {
                 uint16_t mrold = modoRadioHR->getValor();
@@ -411,11 +439,9 @@ static THD_FUNCTION(ThreadHM10, arg) {
             if (opcion==5)
                 ajustaNumero(ttyHM10, minutosAbusoHR);
             if (opcion==6)
-                ajustaNumero(ttyHM10, dsMaxEntreMsgsPozoHR);
+                ajustaNumero(ttyHM10, sMaxEntreMsgsPozoHR);
             if (opcion==7)
                 ajustaNumero(ttyHM10, dsMinEntreMsgsPozoHR);
-            if (opcion==8)
-                ajustaNumeroFloat(ttyHM10, barMaxSensPresionHR);
         }
         else if (modoRadioHR->getValor()==2)
         {
@@ -425,7 +451,7 @@ static THD_FUNCTION(ThreadHM10, arg) {
             if (result != 0 || (result==0 && opcion==4))
                 continue;
             if (opcion==1)
-                cambiaNombreModulo(ttyHM10);
+                configHardware();
             if (opcion==2)
             {
                 uint16_t mrold = modoRadioHR->getValor();

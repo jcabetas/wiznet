@@ -17,7 +17,7 @@ extern holdingRegisterInt *sMaxEntreMsgsLlamadorHR; // s maximo entre mensajes e
 extern holdingRegisterInt *dsMinEntreMsgsLlamadorHR; // ds minimo entre mensajes en modo llamador
 extern holdingRegisterInt *bloqueaAbusonesHR; // 0 no,1 bloqueo abusones
 extern holdingRegisterInt *minutosAbusoHR;   //
-extern holdingRegisterInt *dsMaxEntreMsgsPozoHR; // ds maximo entre mensajes en modo pozo
+extern holdingRegisterInt *sMaxEntreMsgsPozoHR;  // s maximo entre mensajes en modo pozo
 extern holdingRegisterInt *dsMinEntreMsgsPozoHR; // ds minimo entre mensajes en modo pozo
 extern holdingRegisterFloat *barMaxSensPresionHR;     // *10
 extern holdingRegisterInt *pideAguaHR;           // pide agua
