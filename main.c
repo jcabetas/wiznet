@@ -33,28 +33,25 @@ void initColas(void);
 void initHM10(void);
 void llamadorInit(void);
 void pozoInit(void);
-void testMB(void);
+uint8_t initModbus(void);
 void arrancaRadioC(void);
+uint8_t initModbusSlave(void);
 
 void leeVariablesC(void);
 void ponEnLCDC(uint8_t fila, char const msg[]);
 int chLcdprintfFilaC(uint8_t fila, const char *fmt, ...);
 extern uint8_t hayLcd;
 
-//void tickLed(uint8_t numPuls, uint16_t msEntrePuls, stm32_gpio_t *GPIO, uint32_t PAD)
-//{
-//    for (uint8_t numP=0;numP<numPuls;numP++)
-//    {
-//        palClearPad(GPIO, PAD);         // enciende
-//        palClearPad(GPIOC, GPIOC_LED);         // enciende
-//        chThdSleepMilliseconds(100);    // mantiene 100 ms
-//        palSetPad(GPIO, PAD);           // apagado
-//        palSetPad(GPIOC, GPIOC_LED);         // enciende
-//        if (numP<numPuls-1)             // si no es el ultimo, deja apagado 200 ms
-//            chThdSleepMilliseconds(200);
-//    }
-//    chThdSleepMilliseconds(msEntrePuls);
-//}
+void tickLed(void)
+{
+    for (uint16_t i=0;i<4;i++)
+    {
+        palClearLine(LINE_LED1);       // enciende
+        chThdSleepMilliseconds(50);
+        palSetLine(LINE_LED1);         // apaga
+        chThdSleepMilliseconds(150);
+    }
+}
 
 
 
@@ -96,17 +93,21 @@ int main(void) {
   chEvtObjectInit(&newMsgTx_source);
   chEvtObjectInit(&updateLCD_source);
 
+  tickLed();
+
   initColas();
   initDisplay();
-  initSD1();
   chLcdprintfFilaC(3,"Arrancado LCD");
+  initSD1();
   chThdSleepMilliseconds(100);
-  leeVariablesC();
-  chLcdprintfFilaC(3,"Leido variables");
+  chLcdprintfFilaC(3,"Inicializo MB");
+  initModbusSlave();
+  chLcdprintfFilaC(3,"Arranco radio");
+  chThdSleepMilliseconds(100);
+  arrancaRadioC();
+  chLcdprintfFilaC(3,"Arranco HM10");
   chThdSleepMilliseconds(100);
   initHM10();
-  arrancaRadioC();
-  //testMB();
   while (true) {
       chThdSleepMilliseconds(50);
   }

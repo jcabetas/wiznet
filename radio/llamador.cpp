@@ -19,6 +19,8 @@ using namespace chibios_rt;
 #include "radio.h"
 #include "calendarUTC.h"
 #include "lcd.h"
+#include "modbus.h"
+#include "externRegistros.h"
 
 #include <stdlib.h>
 
@@ -41,18 +43,22 @@ extern struct msgRx_t ultMsg;
 
 uint8_t estadoDeseadoSensor;
 
-extern uint16_t modoRadio;
-extern uint16_t sOlvido;
-extern uint16_t idLlamador;
-extern uint16_t dsMaxEntreMsgsLlamador;
-extern uint16_t dsMinEntreMsgsLlamador;
-
-
 thread_t *procesoLlamador = NULL;
 thread_t *procesoSensor = NULL;
 
 
+/*
+      timeBeacon = random(8000,10000);
+      timeOutReintentoTx = random(1000,1200);
 
+  // El funcionamiento básico implica:
+  // - Cuando haya un cambio de estado de llamación, se envía mensaje con separación mínima (timeOutReintentoTx) y nos debe contestar
+  //   tras 3 intentos infructuosos, damos por perdida la comunicación y nos remitimos al beacon para reintento
+  // - Cada <>5s se envia un beacon al pozo para indicar que estamos vivos
+  // - Como el pozo envia cada 5s su situación, si han pasado más de 12s sin recibir ningun mensaje, consideramos que se ha perdido comunicación
+  // - Si no hay comunicación, nos remitimos al beacon para su recuperacion
+ *
+ */
 
 extern "C"
 {
@@ -63,31 +69,22 @@ extern "C"
 
 int32_t randomNum(int32_t numMin, int32_t numMax)
 {
-   //srand((unsigned) time(&t));
    return numMin + (rand() %(numMax-numMin));
 }
 
-// LLAMADOR zona3 [idLlam 1] [dsMin 5] [dsMax 100] [sOlvido 30] pozo.logPozo.txt bOn.radio.pic.0 comOk.radio.pic.0 llam.radio.txt act.radio.txt abu.radio.txt
+// LLAMADOR zona3 [idLlam 1] [dsMin 5] [dsMax 100] [sBeacon 30] pozo.logPozo.txt bOn.radio.pic.0 comOk.radio.pic.0 llam.radio.txt act.radio.txt abu.radio.txt
 llamador::llamador(void)
 {
-    modoRadio = MODOLLAMADOR;
+//    modoRadio = MODOLLAMADOR;
     bombaPozoOn = 0;
     bombaPozoSolicitada = 0;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoDeseado = 0;
-    dsAleatorioMinEntreMsgsLlamador = 2;
-    dsAleatorioMaxEntreMsgsLlamador = 6;
-    //radioPtr = this;
+//    dsAleatorioMinEntreMsgsLlamador = randomNum(dsMinEntreMsgsLlamadorHR->getValor(),dsMaxEntreMsgsLlamador);
+//    sAleatorioBacon = sBeacon + randomNum(0,10);
     estadoComms = 0;
 }
 
-
-
-void llamador::reseteaVariablesEspecificas(void)
-{
-    dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamador + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
-    dsAleatorioMaxEntreMsgsLlamador= dsMaxEntreMsgsLlamador + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
-}
 
 
 /*
@@ -103,7 +100,7 @@ void llamador::enviaStatusLlamacion(void)
     struct msgTx_t msgTx;
     msgTx.numBytes = 3;
     msgTx.msg[0] = MSG_STATUSLLAMACIONLOCAL;
-    msgTx.msg[1] = idLlamador;    //idLlamadorValor();
+    msgTx.msg[1] = idLlamadorHR->getValor();    //idLlamadorValor();
     if (estadoDeseado) // peticion activacion?
         msgTx.msg[2] = '1';
     else
@@ -115,6 +112,8 @@ void llamador::enviaStatusLlamacion(void)
     calendar::getFechaHora(&dateTimeEnvioAnterior);
     chsnprintf(buffer,sizeof(buffer),"Envio llamacion:%d",estadoDeseado);
     escribeLCD(buffer);
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"%s  Envio llamacion:%d\n",buffer,estadoDeseado);
 }
 
 
@@ -122,7 +121,7 @@ void llamador::enviaStatusLlamacion(void)
 void llamador::obsoleto(void)
 {
     // ha pasado mucho tiempo sin recibir?
-    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
+    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sMaxEntreMsgsLlamadorHR->getValor())
     {
         numEstadoComOk = 0;
     }
@@ -132,10 +131,10 @@ void llamador::obsoleto(void)
         update(estadoDeseado);
     }
     // tengo que refrescar datos al pozo?
-    if (calendar::dsDiff(&dateTimeEnvioAnterior) > dsAleatorioMaxEntreMsgsLlamador)
+    if (calendar::dsDiff(&dateTimeEnvioAnterior) > 10*sAleatorioBacon)
     {
         enviaStatusLlamacion();
-        dsAleatorioMaxEntreMsgsLlamador= dsMaxEntreMsgsLlamador + randomNum(0,10);
+        sAleatorioBacon = sMaxEntreMsgsLlamadorHR->getValor() + randomNum(0,10);
     }
 }
 
@@ -149,14 +148,14 @@ void llamador::obsoleto(void)
 uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg)
 {
     uint8_t estadoLlamacionesOld, estadoActivosOld, petBombaOld;
-    estadoLlamacionesOld = estadoLlamaciones;
-    estadoActivosOld = estadoActivos;
+    estadoLlamacionesOld = peticionesIR->getValor(); // estadoLlamaciones
+    estadoActivosOld = activosIR->getValor(); // estadoActivos
     petBombaOld = bombaPozoOn; //estados::diEstado(numInput);//petBomba;
-    estadoLlamaciones = estadoLlamacionesMsg;
-    uint8_t miId = idLlamador;      // Id llamador
-    uint8_t estoyConectadoOld = (estadoActivos>>(miId-1)) & 1;
-    estadoActivos = estadoActivosMsg;
-    estadoAbusonesOld = estadoAbusones;
+    peticionesIR->setValor(estadoLlamacionesMsg);
+    uint8_t miId = idLlamadorHR->getValor();      // Id llamador
+    uint8_t estoyConectadoOld = (activosIR->getValor()>>(miId-1)) & 1;
+    activosIR->setValor(estadoActivosMsg);
+    estadoAbusonesOld = abusonesIR->getValor();
     bombaPozoOn = petBombaMsg;
     uint8_t yoEstabaPidiendoMsg = (estadoLlamacionesMsg>>(miId-1)) & 1;
     uint8_t estoyConectadoMsg = (estadoActivosMsg>>(miId-1)) & 1;
@@ -166,14 +165,14 @@ uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacio
         if (calendar::dsDiff(&dateTimeEnvioAnterior)>(uint32_t)dsAleatorioMinEntreMsgsLlamador)
         {
             enviaStatusLlamacion();
-            dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamador+randomNum(0,10);
+            dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamadorHR->getValor()+randomNum(0,10);
         }
     }
     if (estoyConectadoMsg!=estoyConectadoOld)
     {
         numEstadoComOk = estoyConectadoMsg;
     }
-    if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || bombaPozoOn!=petBombaOld)
+    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaPozoOn!=petBombaOld)
     {
         return 1;
     }
@@ -211,6 +210,8 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Pozo B:%d RSSI:%d", petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  Pozo Bomba:%d RSSI:%d\n",buffer, petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
 //            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
@@ -227,6 +228,8 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEstMsg,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
+            calendar::printHora(buffer,sizeof(buffer));
+            chprintf((BaseSequentialStream *)&SD1,"%s  #%d Llamacion:%d RSSI:%d\n",buffer,numEstMsg,petBombaMsg, msgRx->rssi);
 //            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
 //            chLcdprintfFila(0,buffer);
 //            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
@@ -249,9 +252,11 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
-        uint8_t estadoAbusonesOld = estadoAbusones;
+        uint8_t estadoAbusonesOld = abusonesIR->getValor();
         estProblematica = msgRx->msg[3];
-        estadoAbusones |= (1<<(estProblematica-1));
+        uint16_t estAbusones = abusonesIR->getValor();
+        uint16_t newEstAbusones = (estAbusones |= (1<<(estProblematica-1)));
+        abusonesIR->setValor(newEstAbusones);
         uint8_t numBytes = msgRx->msg[4];
         if (numBytes>sizeof(bufError))
             numBytes = sizeof(bufError);
@@ -259,11 +264,12 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         bufError[numBytes] = 0; // fin de cadena
         actualizoErrorDesdeLlamador(estProblematica, numError, bufError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        if (estadoAbusones != estadoAbusonesOld)
+        if (abusonesIR->getValor() != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
             escribeLCD(buffer);
+            chprintf((BaseSequentialStream *)&SD1,"%d Abusa #%d msg:'%s'\n",calendar::getSecUnix(),estProblematica,bufError);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
 //            chLcdprintfFila(1,"msg:'%s'",bufError);
         }
@@ -283,16 +289,20 @@ void llamador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
-        uint8_t estadoAbusonesOld = estadoAbusones;
+        uint8_t estadoAbusonesOld = abusonesIR->getValor();
         estProblematica = msgRx->msg[3];
-        estadoAbusones &= ~(1<<(estProblematica-1));
+
+        uint16_t estAbusones = abusonesIR->getValor();
+        uint16_t newEstAbusones = (estAbusones &= ~(1<<(estProblematica-1)));
+        abusonesIR->setValor(newEstAbusones);
         radio::limpiaError(estProblematica, numError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        if (estadoAbusones != estadoAbusonesOld)
+        if (abusonesIR->getValor() != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
             escribeLCD(buffer);
+            chprintf((BaseSequentialStream *)&SD1,"%d Deja de abusar #%d\n", calendar::getSecUnix(),estProblematica);
 //            chLcdprintfFila(1,"");
         }
     }
@@ -329,7 +339,7 @@ void llamador::update(uint8_t estadoDeseadoPar)
         {
             bombaPozoSolicitada = estadoDeseado;
             enviaStatusLlamacion();
-            dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamador+randomNum(0,10);
+            dsAleatorioMinEntreMsgsLlamador= dsMinEntreMsgsLlamadorHR->getValor()+randomNum(0,10);
         }
     }
 }
@@ -407,7 +417,6 @@ static THD_FUNCTION(ThreadLlamador, arg) {
 
 uint8_t llamador::init(void)
 {
-    modo = Llamador;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     if (!procesoLlamador)
         procesoLlamador = chThdCreateStatic(waThreadLlamador, sizeof(waThreadLlamador), NORMALPRIO + 7,  ThreadLlamador, NULL);

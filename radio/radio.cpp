@@ -8,6 +8,8 @@ using namespace chibios_rt;
 #include "radio.h"
 #include "calendarUTC.h"
 #include "lcd.h"
+#include "modbus.h"
+#include "externRegistros.h"
 
 void arrancaPozo(void);
 uint8_t esValle(void);
@@ -27,7 +29,7 @@ extern "C" {
 
 radio::radio(void)
 {
-    estadoAbusones = 0;
+    abusonesIR->setValor(0);
     estadoAbusonesOld = 0;
     cntTx = 0;
     cntRx = 0;
@@ -39,14 +41,14 @@ radio::radio(void)
 void radio::escribeLCD(const char *msgLin3)
 {
     char binStr[10], statAbuso[6];
-    if (estadoAbusones==0)
+    if (abusonesIR->getValor()==0)
         strncpy(statAbuso,"     ",sizeof(statAbuso));
     else
         strncpy(statAbuso,"ABUSO",sizeof(statAbuso));
     chLcdprintfFila(0,"%2d Bomba:%d %5s",cntRx, bombaPozoOn, statAbuso);
-    int2str(estadoLlamaciones, binStr);
+    int2str(peticionesIR->getValor(), binStr);
     chLcdprintfFila(1,"Piden:%s",binStr);
-    int2str(estadoActivos, binStr);
+    int2str(activosIR->getValor(), binStr);
     chLcdprintfFila(2,"Activ:%s", binStr);
     chLcdprintfFila(3,msgLin3);
 }
@@ -73,9 +75,9 @@ void radio::reseteaVariables(void)
 {
     time_t ahora;
     ahora = calendar::getSecUnix();
-    estadoLlamaciones = 0;
-    estadoActivos = 0;
-    estadoAbusones = 0;
+    peticionesIR->setValor(0);
+    activosIR->setValor(0);
+    abusonesIR->setValor(0);
     for (uint8_t disp=0;disp<8;disp++)
     {
         timeInicioPeticion[disp] =  ahora;
@@ -280,7 +282,7 @@ void mataRegistrador(void)
 
 void radio::arrancaRadio(void)
 {
-    if (modoRadio==Llamador)
+    if (modoRadioHR->getValor()==0) // llamador
     {
         if (llamadorObj!=NULL)
         {
@@ -293,7 +295,7 @@ void radio::arrancaRadio(void)
         chLcdprintfFila(3,"Arranco llamador");
         llamadorObj->init();
     }
-    else if (modoRadio==Pozo)
+    else if (modoRadioHR->getValor()==1) //pozo
     {
         if (pozoObj!=NULL)
         {
@@ -306,7 +308,7 @@ void radio::arrancaRadio(void)
         chLcdprintfFila(3,"Arranco pozo");
         pozoObj->init();
     }
-    else if (modoRadio==Registrador)
+    else if (modoRadioHR->getValor()==2) // registrador
     {
         if (registradorObj!=NULL)
         {

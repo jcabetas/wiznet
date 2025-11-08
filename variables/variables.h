@@ -7,7 +7,7 @@
 #define VARS_H_
 
 #define     POSMODORADIO                2
-#define     POSSOLVIDO                  4
+#define     POSSBEACON                  4
 
 #define     POSIDLLAMADOR               10
 #define     POSDSMAXENTREMSGSLLAMADOR   12

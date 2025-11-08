@@ -16,7 +16,7 @@ using namespace chibios_rt;
 #include "chprintf.h"
 
 uint16_t modoRadio;
-uint16_t sOlvido;
+uint16_t sBeacon;
 
 uint16_t idLlamador;
 uint16_t dsMaxEntreMsgsLlamador;
@@ -47,7 +47,7 @@ BaseSequentialStream * ttyCOM = (BaseSequentialStream *)&SD1;
 
 void imprimeVariables(void)
 {
-    chprintf(ttyCOM,"- Modo radio: %d,  T. Olvido: %d s\n",modoRadio, sOlvido);
+    chprintf(ttyCOM,"- Modo radio: %d,  T. Olvido: %d s\n",modoRadio, sBeacon);
     chprintf(ttyCOM,"- Id llamador: %d,  ds max entre msgs:%d s,  ds min:%d\n",idLlamador, dsMaxEntreMsgsLlamador, dsMinEntreMsgsLlamador);
     chprintf(ttyCOM,"- Bloqueo abusones: %d,  avisaAbuso:%d,  tiempo abuso :%d min, ds max entre msgs:%d s,  ds min:%d\n",
              bloqueoAbusones, avisaAbuso, tiempoAbuso, dsMaxEntreMsgsPozo, dsMinEntreMsgsPozo);
@@ -71,7 +71,7 @@ uint8_t leeVariables(void)
       }
 
       modoRadio = W25Q16_read_u16(0, POSMODORADIO);
-      sOlvido = W25Q16_read_u16(0, POSSOLVIDO);
+      sBeacon = W25Q16_read_u16(0, POSSBEACON);
 
       idLlamador = W25Q16_read_u16(0, POSIDLLAMADOR);
       dsMaxEntreMsgsLlamador = W25Q16_read_u16(0, POSDSMAXENTREMSGSLLAMADOR);
@@ -90,7 +90,7 @@ uint8_t leeVariables(void)
       chprintf(ttyCOM,"- No hay flash, uso valores de defecto\n");
       // valores de defecto por si no puede leer flash
       modoRadio = 1; // 1:llamador, 2:pozo
-      sOlvido = 500;
+      sBeacon = 500;
 
       idLlamador = 6;
       dsMaxEntreMsgsLlamador = 600;
@@ -123,8 +123,8 @@ void escribeVariables(void)
       W25Q16_sectorErase(0);
 
       W25Q16_write_u16(0, POSMODORADIO, modoRadio);
-      W25Q16_write_u16(0, POSSOLVIDO, sOlvido);
 
+      W25Q16_write_u16(0, POSSBEACON, sBeacon);
       W25Q16_write_u16(0, POSIDLLAMADOR, idLlamador);
       W25Q16_write_u16(0, POSDSMAXENTREMSGSLLAMADOR, dsMaxEntreMsgsLlamador);
       W25Q16_write_u16(0, POSDSMINENTREMSGSLLAMADOR, dsMinEntreMsgsLlamador);

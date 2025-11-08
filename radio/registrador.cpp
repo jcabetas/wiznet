@@ -19,6 +19,8 @@ using namespace chibios_rt;
 #include "radio.h"
 #include "calendarUTC.h"
 #include "lcd.h"
+#include "modbus.h"
+#include "externRegistros.h"
 
 #include <stdlib.h>
 
@@ -38,7 +40,7 @@ extern event_source_t newMsgRx_source;
 extern struct msgRx_t ultMsg;
 
 extern uint16_t modoRadio;
-extern uint16_t sOlvido;
+extern uint16_t sBeacon;
 extern uint16_t dsMaxEntreMsgsLlamador;
 extern uint16_t dsMinEntreMsgsLlamador;
 
@@ -65,7 +67,7 @@ registrador::registrador(void)
 void registrador::obsoleto(void)
 {
     // ha pasado mucho tiempo sin recibir?
-    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sOlvido)
+    if (calendar::sDiff(&dateTimeRxPozoAnterior)>sBeacon)
     {
         numEstadoComOk = 0;
     }
@@ -81,14 +83,14 @@ void registrador::obsoleto(void)
 uint8_t registrador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacionesMsg, uint8_t estadoActivosMsg)
 {
     uint8_t estadoLlamacionesOld, estadoActivosOld, petBombaOld;
-    estadoLlamacionesOld = estadoLlamaciones;
-    estadoActivosOld = estadoActivos;
+    estadoLlamacionesOld = peticionesIR->getValor();
+    estadoActivosOld = activosIR->getValor();
     petBombaOld = bombaPozoOn; //estados::diEstado(numInput);//petBomba;
-    estadoLlamaciones = estadoLlamacionesMsg;
-    estadoActivos = estadoActivosMsg;
-    estadoAbusonesOld = estadoAbusones;
+    peticionesIR->setValor(estadoLlamacionesMsg);
+    activosIR->setValor(estadoActivosMsg);
+    estadoAbusonesOld = abusonesIR->getValor();
     bombaPozoOn = petBombaMsg;
-    if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || bombaPozoOn!=petBombaOld)
+    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaPozoOn!=petBombaOld)
     {
         return 1;
     }
@@ -164,9 +166,9 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
-        uint8_t estadoAbusonesOld = estadoAbusones;
+        uint8_t estadoAbusonesOld = abusonesIR->getValor();
         estProblematica = msgRx->msg[3];
-        estadoAbusones |= (1<<(estProblematica-1));
+        abusonesIR->setValor(abusonesIR->getValor() | (1<<(estProblematica-1)));
         uint8_t numBytes = msgRx->msg[4];
         if (numBytes>sizeof(bufError))
             numBytes = sizeof(bufError);
@@ -174,7 +176,7 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         bufError[numBytes] = 0; // fin de cadena
         actualizoErrorDesdeLlamador(estProblematica, numError, bufError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        if (estadoAbusones != estadoAbusonesOld)
+        if (abusonesIR->getValor() != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
@@ -198,12 +200,12 @@ void registrador::trataRx(struct msgRx_t *msgRx)
         uint8_t numError = msgRx->msg[2];
         if (numEst!=0 || numError!=1)
             return;
-        uint8_t estadoAbusonesOld = estadoAbusones;
+        uint8_t estadoAbusonesOld = abusonesIR->getValor();
         estProblematica = msgRx->msg[3];
-        estadoAbusones &= ~(1<<(estProblematica-1));
+        abusonesIR->setValor(abusonesIR->getValor() & ~(1<<(estProblematica-1)));
         radio::limpiaError(estProblematica, numError);
         memcpy(&ultMsg, msgRx, msgRx->numBytes);
-        if (estadoAbusones != estadoAbusonesOld)
+        if (abusonesIR->getValor() != estadoAbusonesOld)
         {
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
@@ -272,7 +274,6 @@ static THD_FUNCTION(ThreadRegistrador, arg) {
 
 uint8_t registrador::init(void)
 {
-    modo = Registrador;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     if (!procesoRegistrador)
         procesoRegistrador = chThdCreateStatic(waThreadRegistrador, sizeof(waThreadRegistrador), NORMALPRIO + 7,  ThreadRegistrador, NULL);

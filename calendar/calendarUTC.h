@@ -49,6 +49,7 @@ public:
     static uint8_t esDeNoche(void);
     static void addDs(int16_t dsAdd);
     static void printFecha(char *buff, uint16_t longBuff);
+    static void printHora(char *buff, uint16_t longBuff);
     static void vuelcaFecha(void);
     static void updateUnixTime(void);
 };

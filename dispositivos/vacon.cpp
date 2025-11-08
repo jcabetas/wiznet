@@ -14,8 +14,11 @@ using namespace chibios_rt;
 #include "string.h"
 #include "stdlib.h"
 #include "lcd.h"
+#include "registros.h"
 
-uint16_t CRC16(const uint8_t *nData, uint16_t wLength);
+//uint16_t CRC16(const uint8_t *nData, uint16_t wLength);
+
+extern holdingRegister *idMBVaconHR;
 
 
 /*
@@ -50,20 +53,26 @@ uint16_t CRC16(const uint8_t *nData, uint16_t wLength);
  *
  */
 
-extern uint16_t idVacon;
+/*
+ * Estado b1:preparado, b2:En marcha, b3:fallo
+ */
+
+//extern holdingRegister *vaconIdHR;
+//extern uint16_t idVacon;
 
 
-static const char *descMedidaVacon[] = {"Hz","rpm", "I", "P%" ,"FaultCode"};
-static const uint16_t addressVacon[] = {2102, 2103, 2104, 2106, 2109      };
-static const float escalaVacon[] =     {0.01f,1.0f, 0.1f,0.1f ,1.0f       };
+static const char *descMedidaVacon[] = {"Hz","rpm", "I", "P%" ,"AI2%","Estado","FaultCode"};
+static const uint16_t addressVacon[] = {2102, 2103, 2104, 2106, 59,    42,      2109      };
+static const float escalaVacon[] =     {0.01f,1.0f, 0.1f,0.1f ,0.01f,  1.0f,    1.0f       };
 
 
-vacon::vacon(const char *nombrePar)
+vacon::vacon(modbusMaster *modbusPtr, const char *nombrePar)
 {
+    modbusConectado = modbusPtr;
     strncpy(nombre,nombrePar,sizeof(nombre));
     numMedidas = 0;
     erroresSeguidos = 0;
-    modbus::addDisp(this);
+    modbusPtr->addDisp(this);
 };
 
 vacon::~vacon()
@@ -87,13 +96,13 @@ int8_t vacon::init(void)
     return 0;
 }
 
-void vacon::addDs(uint16_t ds)
+void vacon::addms(uint16_t ms)
 {
     for (uint8_t m=1;m<=numMedidas;m++)
     {
-        if (dsDesdeUpdate[m] < dsUpdateMaxMed[m])
+        if (msDesdeUpdate[m] < msUpdateMaxMed[m])
         {
-            dsDesdeUpdate[m] += ds;
+            msDesdeUpdate[m] += ms;
         }
     }
 }
@@ -105,7 +114,7 @@ void vacon::addDs(uint16_t ds)
     uint8_t dsUpdateMaxMed[MAXMEDIDAS];
     uint16_t dsDesdeUpdate[MAXMEDIDAS];
  */
-uint8_t vacon::attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t dsUpdatePar, const char *descrPar)
+uint8_t vacon::attachMedida(float *ptrMedPar, const char *tipoMedida, uint16_t msUpdatePar, const char *descrPar)
 {
     if (numMedidas>=MAXMEDIDAS)
     {
@@ -125,8 +134,8 @@ uint8_t vacon::attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t ds
             tipoMed[numMedidas] = tip;
             strncpy(descrMed[numMedidas], descrPar, sizeof(descrMed[numMedidas]));
             ptrMed[numMedidas] = ptrMedPar;
-            dsUpdateMaxMed[numMedidas] = dsUpdatePar;
-            dsDesdeUpdate[numMedidas] = dsUpdatePar + 1;  // para que se lea inmediatamente al comienzo
+            msUpdateMaxMed[numMedidas] = msUpdatePar;
+            msDesdeUpdate[numMedidas] = msUpdatePar + 1;  // para que se lea inmediatamente al comienzo
             numMedidas++;
             return 0;
         }
@@ -135,12 +144,12 @@ uint8_t vacon::attachMedida(float *ptrMedPar, const char *tipoMedida, uint8_t ds
     return 0;
 }
 
-void vacon::leer(uint16_t *valorInt, uint16_t addressReg, int16_t *error)
+void vacon::leer(uint16_t *valorInt, uint16_t addressReg, uint8_t *error)
 {
-    uint16_t bytesReceived;
-    uint16_t msgCRC, rxCRC;
-    uint8_t buffer[20];
-    uint8_t bufferRx[20];
+//    uint16_t bytesReceived;
+//    uint16_t msgCRC, rxCRC;
+//    uint8_t buffer[20];
+    uint8_t bufferRx[30];
 
     /*
      * Example
@@ -157,42 +166,47 @@ void vacon::leer(uint16_t *valorInt, uint16_t addressReg, int16_t *error)
     Error Check Low 71
     Error Check High CB
      */
-    buffer[0] = idVacon;
-    buffer[1] = 0x04;
-    buffer[2] = (addressReg&0xFF00)>>8;
-    buffer[3] = addressReg&0xFF;
-    buffer[4] = 0;
-    buffer[5] = 1;
+    uint8_t idVacon = idMBVaconHR->getValor();
+//    buffer[0] =  idVacon;
+//    buffer[1] = 0x04;
+//    buffer[2] = (addressReg&0xFF00)>>8;
+//    buffer[3] = addressReg&0xFF;
+//    buffer[4] = 0;
+//    buffer[5] = 1;
 
-    msgCRC = CRC16(buffer, 6);
-    buffer[6] = msgCRC & 0xFF;
-    buffer[7] = (msgCRC & 0xFF00) >>8;
-    bufferRx[0] = 0;
-    bufferRx[1] = 0;
-    modbus::chprintStrRs485(buffer, 6, chTimeMS2I(100));
-    *error = modbus::chReadStrRs485(bufferRx, 7, &bytesReceived, chTimeMS2I(100));
-    if (*error!=0 || bytesReceived!=9)
-    {
-        *error = -1;
-        *valorInt = 0;
-        chLcdprintfFila(2,"Error modbus vacon");
-        return;
-    }
-    msgCRC = CRC16(bufferRx, bytesReceived-2);
-    rxCRC = (bufferRx[bytesReceived-1]<<8) + bufferRx[bytesReceived-2];
-    if (msgCRC!=rxCRC || direccion!= bufferRx[0] || bufferRx[1]!=0x04)
-    {
-        *error = -2;
-        *valorInt = 0;
-        return;
-    }
+    modbusConectado->enviaMBfunc(4, idVacon, addressReg, 1, bufferRx, sizeof(bufferRx), 300, &msDelay, error);
+//
+//    msgCRC = CRC16(buffer, 6);
+//    buffer[6] = msgCRC & 0xFF;
+//    buffer[7] = (msgCRC & 0xFF00) >>8;
+//    bufferRx[0] = 0;
+//    bufferRx[1] = 0;
+//    modbus::chprintStrRs485(buffer, 8, chTimeMS2I(100));
+//    *error = modbus::chReadStrRs485(bufferRx, 7, &bytesReceived, chTimeMS2I(100));
+//    if (*error!=0 || bytesReceived!=7)
+//    {
+//        *error = 1;
+//        *valorInt = 0;
+//        chLcdprintfFila(2,"Error modbus vacon");
+//        return;
+//    }
+//    msgCRC = CRC16(bufferRx, bytesReceived-2);
+//    rxCRC = (bufferRx[bytesReceived-1]<<8) + bufferRx[bytesReceived-2];
+//    if (msgCRC!=rxCRC || idVacon!= bufferRx[0] || bufferRx[1]!=0x04)
+//    {
+//        *error = 2;
+//        *valorInt = 0;
+//        return;
+//    }
     // en 3 y 4 esta el valor entero
-    *valorInt = (bufferRx[3]<<8) + bufferRx[4];
-    *error = 0;
+    if (!error)
+        *valorInt = (bufferRx[3]<<8) + bufferRx[4];
+    else
+        *valorInt = 0;
     return;
 }
 
-void vacon::leerTip(float *valor, uint8_t tipMedida, int16_t *error)
+void vacon::leerTip(float *valor, uint8_t tipMedida, uint8_t *error)
 {
     uint16_t valorInt;
     uint16_t addressReg = addressVacon[tipMedida];
@@ -214,11 +228,11 @@ void vacon::leerTip(float *valor, uint8_t tipMedida, int16_t *error)
 uint8_t vacon::usaBus(void)
 {
     float valor;
-    int16_t error;
+    uint8_t error;
     uint8_t heEnviado = 1;
     for (uint8_t m=1;m<=numMedidas;m++)
     {
-        if (dsDesdeUpdate[m-1] >= dsUpdateMaxMed[m-1])
+        if (msDesdeUpdate[m-1] >= msUpdateMaxMed[m-1])
         {
             uint8_t tip = tipoMed[m-1];
             leerTip(&valor, tip, &error);
@@ -240,12 +254,6 @@ uint8_t vacon::usaBus(void)
             }
             else
                 erroresSeguidos = 0;
-            // quizas hay que multiplicar valor (p.e. Px2)
-            if (tip==3)
-                valor *= 2.0f;
-            if (tip==4)
-                valor *= 3.0f;
-//            med->setValidez(1); ya se valida al hacer el set
             *ptrMed[m-1] = valor;
         }
     }

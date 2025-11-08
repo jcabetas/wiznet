@@ -24,4 +24,16 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>lcd.cpp</name>
+			<type>1</type>
+			<location>/home/joaquin/Desarrollos/librerias/lcd/lcd.cpp</location>
+		</link>
+		<link>
+			<name>librerias</name>
+			<type>2</type>
+			<location>/home/joaquin/Desarrollos/librerias</location>
+		</link>
+	</linkedResources>
 </projectDescription>

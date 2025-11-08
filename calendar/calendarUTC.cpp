@@ -236,6 +236,11 @@ void calendar::printFecha(char *buff, uint16_t longBuff)
     chsnprintf(buff,longBuff,"%d/%d/%d %d:%d:%d",fechaNow.tm_mday,fechaNow.tm_mon+1,fechaNow.tm_year-100,fechaNow.tm_hour,fechaNow.tm_min,fechaNow.tm_sec);
 }
 
+void calendar::printHora(char *buff, uint16_t longBuff)
+{
+    rtcGetFecha();
+    chsnprintf(buff,longBuff,"%02d:%02d:%02d.%1d",fechaNow.tm_hour,fechaNow.tm_min,fechaNow.tm_sec,fechaHoraNow.dsUnix);
+}
 
 void calendar::vuelcaFecha(void)
 {

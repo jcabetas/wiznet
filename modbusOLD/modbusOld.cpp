@@ -199,7 +199,7 @@ void modbus::leeTodos(uint8_t incluyeErroneos)
                     if (error)
                         chprintf((BaseSequentialStream *)&SD1,"Error en %s\n",disp->diNombre());
                     else
-                        chprintf((BaseSequentialStream *)&SD1,"Recuperado eror de %s\n",disp->diNombre());
+                        chprintf((BaseSequentialStream *)&SD1,"Recuperado error de %s\n",disp->diNombre());
                 }
                 if (error!=2)
                     errorEnDispMB[d-1] = error;
@@ -306,8 +306,9 @@ void modbus::print(void)
     chprintf((BaseSequentialStream *)&SD1,"MODBUS %d baud, %d dispositivos\n",baudios, numDispositivosMB);
 }
 
-float medidaV;
+float medidaP;
 float frecuencia;
+float presion;
 
 sdm120ct *medflexo;
 vacon *inversorRiba;
@@ -315,15 +316,18 @@ vacon *inversorRiba;
 void testMB(void)
 {
     modbus *modbusObj = new modbus(9600);
+    medidaP = 0.0f;
+    frecuencia = 0.0f;
+    presion = 0.0f;
 
-    medflexo = new sdm120ct("flexo",2);
-//    medflexo->attachMedida(&medidaV, "V", 10, "tension flexo");
-//    modbusObj->addDisp(medflexo);
+    medflexo = new sdm120ct("MedInv",2);
+    medflexo->attachMedida(&medidaP, "Px3", 20, "Pot.Inversor");
+    modbusObj->addDisp(medflexo);
 
     inversorRiba = new vacon("inversor");
-    //inversorRiba->attachMedida(&frecuencia, "Hz", 50, "Frecuencia");
-//    modbusObj->addDisp(inversorRiba);
+    inversorRiba->attachMedida(&frecuencia, "Hz", 20, "Frecuencia");
+    inversorRiba->attachMedida(&frecuencia, "AI2%", 10, "Presion");
+    modbusObj->addDisp(inversorRiba);
 
     modbusObj->init();
-
 }

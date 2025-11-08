@@ -17,6 +17,8 @@ using namespace chibios_rt;
 #include "colas.h"
 #include "radio.h"
 #include "calendarUTC.h"
+#include "modbus.h"
+#include "externRegistros.h"
 
 time_t GetTimeUnixSec(void);
 
@@ -43,8 +45,28 @@ uint32_t msEntreFechas(RTCDateTime *fechaNew, RTCDateTime *fechaOld);
 int32_t randomNum(int32_t numMin, int32_t numMax);
 void int2str(uint8_t valor, char *string);
 
+/*
+ * En pozo.ino
+ *  // Si un llamador no ha mandado un mensaje durante más de este valor, se le considera apagado (5 minutos)
+    #define TIMEOUT_LLAMADORES 300000L
+    // 6 horas = Tiempo límite para desconectar a un llamador que abusa y tiene activa la llamación mucho tiempo.
+    // Si un llamador supera este tiempo de llamada, se le ignora hasta que se ponga a cero
+    #define MILLIS_DURACION_LIMITE_LLAMACION 21600000L  // 6 horas
+    // #define MILLIS_DURACION_LIMITE_LLAMACION 6000L // 6 seg
+    // Si cierta, ignoraremos a los abusones y dejaremos de hacerle caso a un llamador cuya llamada supere el tiempo MILLIS_DURACION_LIMITE_LLAMACION
+    #define IGNORAR_LLAMADORES_ABUSIVOS 1
+
+    En llamador.ino:
+      timeBeacon = random(8000,10000);
+      timeOutReintentoTx = random(1000,1200);
+      // Si hace mucho que no oimos al Pozo (12s), ponemos que no nos oye y decimos que la bomba está apagada
+      if (millsUltimoMensajeRecibido>0 && (now - millsUltimoMensajeRecibido >= 12000))
+
+ *
+ */
+
 extern uint16_t modoRadio;
-extern uint16_t sOlvido;
+extern uint16_t sBeacon;
 extern uint16_t bloqueoAbusones;
 extern uint16_t avisaAbuso;
 extern uint16_t tiempoAbuso;         // minutos
@@ -57,10 +79,10 @@ thread_t *procesoPozo = NULL;
 /*
  * Envia MSG_STATUSPOZO
     //    Byte 0: MSG_STATUSPOZO
-    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 sat�lites llamadores
+    //    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
     //    Byte 2: Estado bomba del Pozo '0' '1'
-    //    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el sat�lite ha de transmitir como mucho cada 15 segundos
-    //    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una se�al de llamaci�n de un sat�lite. Se distribuye a todo el mundo, para que todos puedan saber la situaci�n
+    //    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el satelite ha de transmitir como mucho cada 15 segundos
+    //    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una senyal de llamacion de un satelite. Se distribuye a todo el mundo, para que todos puedan saber la situacion
  *
  */
 // POZO bOn.radio.pic.0 [dsMin 5] [dsMax 100] [blAbus 1] [tAbus 10] [sOlv 50] pozo.logPozo.txt llam.radio.txt act.radio.txt abu.radio.txt
@@ -80,9 +102,9 @@ void pozo::reseteaVariablesEspecificas(void)
     dsAleatorioMaxEntreMsgsPozo = dsMaxEntreMsgsPozo + randomNum(0,10); //dsMinEntreMsgsLlamadorValor()
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
         timeUltConexion[disp] = 0;
-    estadoActivos = 0;
-    estadoAbusones = 0;
-    estadoLlamaciones = 0;
+    activosIR->setValor(0);
+    abusonesIR->setValor(0);
+    peticionesIR->setValor(0);
     // errores de Jandro
     // tratamiento de errores de Jandro
     for (int8_t numAviso=0;numAviso<MAXERRORESAVISO;numAviso++)
@@ -125,7 +147,9 @@ uint8_t pozo::quitarAbuso(uint8_t numEstacion)
     time_t ahora;
     if (numEstacion==0 || numEstacion>8 || modoRadio!=MODOPOZO)
         return 1;
-    estadoAbusones &=  ~(1<<(numEstacion-1));  // si abusaba, ya no
+    uint16_t estAbus = abusonesIR->getValor();
+    estAbus &=  ~(1<<(numEstacion-1));  // si abusaba, ya no
+    abusonesIR->setValor(estAbus);
     enviaClearErrorPozo(1, numEstacion);
     limpiaError(numEstacion, 1);
     ahora = GetTimeUnixSec();
@@ -144,8 +168,8 @@ void pozo::enviaStatusPozo(void)
         msgTx.msg[2] = '1';
     else
         msgTx.msg[2] = '0';
-    msgTx.msg[3] = estadoActivos;
-    msgTx.msg[4] = estadoLlamaciones;
+    msgTx.msg[3] = activosIR->getValor();
+    msgTx.msg[4] = peticionesIR->getValor();
     putQueu(&colaMsgTx, &msgTx);
     chEvtBroadcast(&newMsgTx_source);
     if (++cntTx>99)
@@ -182,9 +206,9 @@ void pozo::enviaErrorPozo(uint8_t slot) //uint8_t numError, uint8_t numEstProble
 
 // Formato del mensaje:
 //    Byte 0: MSG_CLEARERROR
-//    Byte 1: Id del originador: 0=Pozo, 1 a 8 sat�lites llamadores
-//    Byte 2: N�mero de error
-//    Byte 3: Id estaci�n con problemas resueltos. 0=Pozo, 1 a 8 sat�lites llamadores
+//    Byte 1: Id del originador: 0=Pozo, 1 a 8 satelites llamadores
+//    Byte 2: Numero de error
+//    Byte 3: Id estacion con problemas resueltos. 0=Pozo, 1 a 8 satelites llamadores
 //
 void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
 {
@@ -204,9 +228,9 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
 void pozo::updateEstadoBomba(void) // estadoPeticionBomba
 {
     if (bloqueoAbusones)
-        bombaPozoOn = ((estadoLlamaciones & ~estadoAbusones)>0);
+        bombaPozoOn = ((peticionesIR->getValor() & ~abusonesIR->getValor())>0);
     else
-        bombaPozoOn = (estadoLlamaciones>0);
+        bombaPozoOn = (peticionesIR->getValor()>0);
 }
 
 /*
@@ -218,19 +242,19 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     uint8_t estadoLlamacionesOld, estadoActivosOld, estadoAbusonesOld, estadoBombaOld;
 //    char nombre[20], telef[15];
 //    struct tm fechaIni;
-    estadoLlamacionesOld = estadoLlamaciones;
-    estadoActivosOld = estadoActivos;
-    estadoAbusonesOld = estadoAbusones;
+    estadoLlamacionesOld = peticionesIR->getValor();
+    estadoActivosOld = activosIR->getValor();
+    estadoAbusonesOld = abusonesIR->getValor();
     estadoBombaOld = bombaPozoOn;
     uint8_t estacionMsgMenosUno = estacionMsg-1;
     time_t ahora = calendar::getSecUnix();
     timeUltConexion[estacionMsgMenosUno] = ahora;
-    estadoActivos |= (1<<estacionMsgMenosUno);
-    uint8_t estabaPidiendo = (estadoLlamaciones>>estacionMsgMenosUno) & 1;
-    uint8_t estabaAbusando = (estadoAbusones>>estacionMsgMenosUno) & 1;
+    activosIR->setValor(activosIR->getValor() | (1<<estacionMsgMenosUno)); //    estadoActivos |= (1<<estacionMsgMenosUno);
+    uint8_t estabaPidiendo = (peticionesIR->getValor()>>estacionMsgMenosUno) & 1;
+    uint8_t estabaAbusando = (abusonesIR->getValor()>>estacionMsgMenosUno) & 1;
     if (!bloqueoAbusones && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
     {
-        estadoAbusones &=  ~(1<<estacionMsgMenosUno);  // si abusaba, ya no
+        abusonesIR->setValor(abusonesIR->getValor() & ~(1<<estacionMsgMenosUno));  // si abusaba, ya no
         enviaClearErrorPozo(1, estacionMsg);
         limpiaError(estacionMsg, 1);
     }
@@ -238,7 +262,7 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
     if (bloqueoAbusones && !estabaAbusando && estabaPidiendo && petBombaMsg
             && (ahora-timeInicioPeticion[estacionMsgMenosUno]>tiempoAbuso))
     {
-        estadoAbusones |= (1<<estacionMsgMenosUno);
+        abusonesIR->setValor(abusonesIR->getValor() | (1<<estacionMsgMenosUno));
         uint8_t slot = actualizoErrorDesdePozo(estacionMsg);
         enviaErrorPozo(slot);
         if (avisaAbuso && bloqueoAbusones)
@@ -253,11 +277,11 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
         }
     }
     if (petBombaMsg==0)
-        estadoLlamaciones &= ~(1<<(estacionMsgMenosUno));
+        peticionesIR->setValor(peticionesIR->getValor() & ~(1<<(estacionMsgMenosUno)));
     else
-        estadoLlamaciones |= (1<<(estacionMsgMenosUno));
+        peticionesIR->setValor(peticionesIR->getValor() | (1<<(estacionMsgMenosUno)));
     updateEstadoBomba();
-    if (estadoLlamaciones!=estadoLlamacionesOld || estadoActivos!=estadoActivosOld || estadoAbusones!=estadoAbusonesOld
+    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || abusonesIR->getValor()!=estadoAbusonesOld
             || estadoBombaOld!=bombaPozoOn)
     {
         if (bombaPozoOn)
@@ -280,17 +304,17 @@ void pozo::obsoleto(void)
     uint8_t hayCambios = 0;
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
     {
-        uint8_t estabaActivo = (estadoActivos>>disp) & 1;
-        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sOlvido)
+        uint8_t estabaActivo = (activosIR->getValor()>>disp) & 1;
+        if (estabaActivo && calendar::sDiff(&timeUltConexion[disp]) > sBeacon)
         {
-            estadoActivos &= ~(1<<disp);
-            estadoAbusones &= ~(1<<disp);
-            estadoLlamaciones &= ~(1<<disp);
+            activosIR->setValor(activosIR->getValor() & ~(1<<disp));
+            abusonesIR->setValor(abusonesIR->getValor() & ~(1<<disp));
+            peticionesIR->setValor(peticionesIR->getValor() & ~(1<<disp));
             envioEstado = 1;
             hayCambios = 1;
         }
     }
-    if (envioEstado==0)  // hace mucho tiempo que no env�o nada?
+    if (envioEstado==0)  // hace mucho tiempo que no envio nada?
     {
         uint32_t dsDif = calendar::dsDiff(&dateTimeEnvioAnterior);
         if (dsDif>dsMaxEntreMsgsPozo)
@@ -348,38 +372,10 @@ void pozo::trataRx(struct msgRx_t *msgRx)
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
             chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEst,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
-            // TODO enviar a NExtion
-//            chEvtBroadcast(&hayRxParaLCD_source);
         }
     }
 }
 
-//void pozo::trataRxRf95(eventmask_t evt)
-//{
-//    struct msgRx_t msgRx;
-//    struct msgTx_t msgTx;
-//    if (evt==0) // timeout, llamo a rutinas
-//    {
-//        trataObsoletoPozo();
-//    }
-//    if (evt & EVENT_MASK(0)) // He recibido un mensaje rf95
-//    {
-//        while (getQueu(&colaMsgRx, &msgRx))
-//        {
-////            if (++cnt>99) cnt=0;
-//                trataRx(&msgRx);
-//        }
-//    }
-//    if (evt & EVENT_MASK(1)) // Tengo que enviar mensajes rf95
-//    {
-//        while (getQueu(&colaMsgTx, &msgTx))
-//        {
-////            pozoObj->send(msgTx.msg,msgTx.numBytes);
-////            pozoObj->waitPacketSent(100);
-////            pozoObj->setModeRx();
-//        }
-//    }
-//}
 
 pozo::~pozo()
 {
@@ -404,7 +400,6 @@ void pozo::stop(void)
 
 
 
-/////////////////////////////////////////////////////////////////////////////////
 
 pozo *pozoObj;
 
@@ -440,7 +435,6 @@ static THD_FUNCTION(ThreadPozo, arg) {
 
 uint8_t pozo::init(void)
 {
-    modo = Pozo;
     if (!procesoPozo)
         procesoPozo = chThdCreateStatic(waThreadPozo, sizeof(waThreadPozo), NORMALPRIO + 7,  ThreadPozo, NULL);
     return 0;

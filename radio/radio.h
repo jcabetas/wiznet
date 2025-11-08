@@ -29,7 +29,7 @@
 extern "C" {
     void arrancaRadioC(void);
 }
-
+void int2str(uint8_t valor, char *string);
 
 struct datosIdGuardados
 {
@@ -64,10 +64,10 @@ typedef enum
 class radio
 {
 protected:
-    ModoRadio modo;  // modoRadio
+//    ModoRadio modo;  // modoRadio
     uint16_t bombaPozoOn;                                             // segun mensajes del pozo
     uint16_t numEstadoComOk, numEstadoBomba;
-    uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
+//    uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
     uint8_t estadoAbusonesOld;
     time_t timeInicioPeticion[NUMSATELITES];
     time_t timeUltConexion[NUMSATELITES];
@@ -113,7 +113,7 @@ protected:
     uint16_t estadoDeseado;
     uint8_t  estadoComms;
     uint16_t dsAleatorioMinEntreMsgsLlamador;
-    uint16_t dsAleatorioMaxEntreMsgsLlamador;
+    uint16_t sAleatorioBacon;
     struct fechaHora dateTimeRxPozoAnterior;
 public:
     llamador(void);

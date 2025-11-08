@@ -121,6 +121,7 @@ include $(CHIBIOS)/tools/mk/autobuild.mk
 # Other files (optional).
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
+include /home/joaquin/Desarrollos/librerias/librerias.mk
 
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32F411xE.ld
@@ -138,12 +139,15 @@ CPPSRC = $(ALLCPPSRC) \
 		 rf95/RH_RF95.cpp rf95/rf95.cpp \
          radio/llamador.cpp radio/pozo.cpp radio/radio.cpp radio/registrador.cpp \
          calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
-         serial.cpp tty/gets.cpp heap.cpp lcd/lcd.cpp lcd/threadDisplay.cpp \
+         tty/gets.cpp heap.cpp  serial.cpp \
          colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp \
-         modbus/modbus.cpp modbus/sdm120ct.cpp modbus/vacon.cpp modbus/crc.cpp modbus/dispositivos.cpp
+		 modbuslib/crc.cpp modbuslib/holdingRegisters.cpp modbuslib/inputRegisters.cpp \
+         modbus/slaveMB.cpp \
+         modbuslib/modbus.cpp modbuslib/modbusMaestro.cpp modbuslib/modbusSlave.cpp \
+         dispositivos/dispositivos.cpp dispositivos/sdm120ct.cpp dispositivos/medida.cpp  \
 
 
-#         usbSource/serialUSB.cpp w25q16/varsFlash.cpp
+#         usbSource/serialUSB.cpp w25q16/varsFlash.cpp lcd/lcd.cpp lcd/threadDisplay.cppf
 
 # List ASM source files here.
 ASMSRC = $(ALLASMSRC)
@@ -175,7 +179,7 @@ UDEFS = -DCHPRINTF_USE_FLOAT=TRUE
 UADEFS =
 
 # List all user directories here
-UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar lcd colas ssd1306 rf95 pozo modbus radio
+UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar colas ssd1306 rf95 pozo modbus modbuslib dispositivos radio
 
 # List the user directory to look for the libraries here
 ULIBDIR =

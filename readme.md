@@ -5,7 +5,14 @@ ChibiOS/RT port for ARM-Cortex-M4 STM32F411.
 
 ## Hardware:
 -  STM32F411, datos en https://stm32-base.org/boards/STM32F411CEU6-WeAct-Black-Pill-V2.0.html
--  Placa Alim. "miniPozo"
+-  Placa Alim. "miniPozo V3"
+
+## Modos de funcionamiento
+### Modo llamador
+-  modbus funciona como esclavo obedeciendo al PLC. La petición se activa por modbus o por sensor
+-  la radio actua como "llamador" la petición al pozo sólo dura XX segundos, hay que repetir periódicamente
+### Modo pozo
+-  Activa inversor por medio del relé
 
 ## Errores de placa V0:
 -  El rele esta conectado a PC14, que es salida de oscilador. Si no funciona, hay que usar oscilador interno

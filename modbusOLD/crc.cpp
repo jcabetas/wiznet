@@ -7,32 +7,34 @@
 
 #include "hal.h"
 #include "chprintf.h"
+#include "modbus.h"
+
 
 #define POLINOMIO_MODBUS 0xA001
 
-uint16_t ModbusRtuSdm_CRC16(uint8_t *buffer, uint16_t lenBuffer)
-{
-    uint8_t i, byte;
-    uint16_t numByte, CRCResult;
-    CRCResult = 0xFFFF;
-    for(numByte=0; numByte<lenBuffer; numByte++)
-    {
-        byte = buffer[numByte];
-        CRCResult = CRCResult^byte;
-        for(i=0;i<8;i++)
-        {
-            if(CRCResult & 0x0001)
-            {
-                CRCResult -= 1;
-                CRCResult = CRCResult>>1;
-                CRCResult ^= POLINOMIO_MODBUS;
-            }
-            else
-                CRCResult = CRCResult>>1;
-        }
-    }
-    return CRCResult;
-}
+//uint16_t ModbusRtuSdm_CRC16(uint8_t *buffer, uint16_t lenBuffer)
+//{
+//    uint8_t i, byte;
+//    uint16_t numByte, CRCResult;
+//    CRCResult = 0xFFFF;
+//    for(numByte=0; numByte<lenBuffer; numByte++)
+//    {
+//        byte = buffer[numByte];
+//        CRCResult = CRCResult^byte;
+//        for(i=0;i<8;i++)
+//        {
+//            if(CRCResult & 0x0001)
+//            {
+//                CRCResult -= 1;
+//                CRCResult = CRCResult>>1;
+//                CRCResult ^= POLINOMIO_MODBUS;
+//            }
+//            else
+//                CRCResult = CRCResult>>1;
+//        }
+//    }
+//    return CRCResult;
+//}
 
 static const uint16_t wCRCTable[] = {
    0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301, 0X03C0, 0X0280, 0XC241,
@@ -69,7 +71,7 @@ static const uint16_t wCRCTable[] = {
    0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
 
-uint16_t CRC16(const uint8_t *nData, uint16_t wLength)
+uint16_t modbus::CRC16(const uint8_t *nData, uint16_t wLength)
 {
 
 
@@ -86,12 +88,12 @@ uint16_t wCRCWord = 0xFFFF;
 } // End: CRC16
 
 
-
-uint16_t CRC16Byte(uint16_t wCRCWord, uint8_t nData)
-{
-    uint8_t nTemp;
-    nTemp = nData++ ^ wCRCWord;
-    wCRCWord >>= 8;
-    wCRCWord  ^= wCRCTable[nTemp];
-    return wCRCWord;
-}
+//
+//uint16_t CRC16Byte(uint16_t wCRCWord, uint8_t nData)
+//{
+//    uint8_t nTemp;
+//    nTemp = nData++ ^ wCRCWord;
+//    wCRCWord >>= 8;
+//    wCRCWord  ^= wCRCTable[nTemp];
+//    return wCRCWord;
+//}

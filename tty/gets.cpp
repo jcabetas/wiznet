@@ -11,6 +11,7 @@
 #include "tty.h"
 #include "string.h"
 #include "chprintf.h"
+#include <stdlib.h>
 
 
 using namespace chibios_rt;
@@ -367,6 +368,7 @@ int16_t preguntaNumero(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr,
     return 0;
 }
 
+
 int16_t preguntaNumeroHM10(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax)
 {
     uint8_t buffer[50];
@@ -378,9 +380,10 @@ int16_t preguntaNumeroHM10(BaseChannel *ttyBC, const char *msg, uint32_t *numero
     chprintf((BaseSequentialStream *)tty," [%d...%d]:", valorMin, valorMax);
     chgetsNoEchoTimeOutHM10(ttyBC, buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
 //    chgets(ttyBC, buffer,sizeof(buffer));
-    chprintf((BaseSequentialStream *)tty,"\n\r");
+//    chprintf((BaseSequentialStream *)tty,"\n\r");
     if (huboTimeout)     // timeout, abortar
     {
+        chprintf((BaseSequentialStream *)tty,"\n");
         return 2;
     }
     if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
@@ -390,21 +393,59 @@ int16_t preguntaNumeroHM10(BaseChannel *ttyBC, const char *msg, uint32_t *numero
         error = Str2Int(buffer, &resultado);
         if (error)
         {
-            chprintf((BaseSequentialStream *)tty,"Numero invalido!!\n\r");
+            chprintf((BaseSequentialStream *)tty,"Numero invalido!!\n");
             return 3;
         }
     }
     if (resultado>valorMax)
     {
-        chprintf((BaseSequentialStream *)tty,"Demasiado alto!!\n\r");
+        chprintf((BaseSequentialStream *)tty,"Demasiado alto!!\n");
         return 4;
     }
     if (resultado<valorMin)
     {
-        chprintf((BaseSequentialStream *)tty,"Demasiado bajo!!\n\r");
+        chprintf((BaseSequentialStream *)tty,"Demasiado bajo!!\n");
         return 5;
     }
+    chprintf((BaseSequentialStream *)tty,"%d\n",resultado);
     *numeroPtr = resultado;
     return 0;
 }
 
+
+int16_t preguntaNumeroHM10Float(BaseChannel *ttyBC, const char *msg, float *numeroPtr, float valorMin, float valorMax)
+{
+    uint8_t buffer[50];
+    float resultado;
+    uint8_t huboTimeout;
+    BaseSequentialStream *tty = (BaseSequentialStream *)ttyBC;
+    chprintf((BaseSequentialStream *)tty,msg);
+    chprintf((BaseSequentialStream *)tty," [%.2f...%.2f]:", valorMin, valorMax);
+    chgetsNoEchoTimeOutHM10(ttyBC, buffer,sizeof(buffer), TIME_MS2I(20000), &huboTimeout);
+//    chgets(ttyBC, buffer,sizeof(buffer));
+//    chprintf((BaseSequentialStream *)tty,"\n\r");
+    if (huboTimeout)     // timeout, abortar
+    {
+        chprintf((BaseSequentialStream *)tty,"\n");
+        return 2;
+    }
+    if (!strncmp("",(char *)buffer,10))     // en blanco, acepto defecto
+        resultado = *numeroPtr;
+    else
+    {
+        resultado = atof((char *) buffer);
+    }
+    if (resultado>valorMax)
+    {
+        chprintf((BaseSequentialStream *)tty,"Demasiado alto!!\n");
+        return 4;
+    }
+    if (resultado<valorMin)
+    {
+        chprintf((BaseSequentialStream *)tty,"Demasiado bajo!!\n");
+        return 5;
+    }
+    chprintf((BaseSequentialStream *)tty,"%.2f\n",resultado);
+    *numeroPtr = resultado;
+    return 0;
+}

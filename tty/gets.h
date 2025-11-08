@@ -16,6 +16,7 @@ int32_t leeNumeroMsg(int32_t valorInicial, uint8_t numFilaMsg, uint8_t numFilaIn
 uint32_t leeNumero(char *mensaje, uint32_t minValue, uint32_t maxValue);
 int16_t preguntaNumero(BaseChannel  *tty, const char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax);
 int16_t preguntaNumeroHM10(BaseChannel *ttyBC, const char *msg, uint32_t *numeroPtr, uint32_t valorMin, uint32_t valorMax);
+int16_t preguntaNumeroHM10Float(BaseChannel *ttyBC, const char *msg, float *numeroPtr, float valorMin, float valorMax);
 void int2str(uint8_t valor, char *string);
 uint8_t chgetchTimeOut(BaseChannel  *SD, systime_t timeout, uint8_t *huboTimeout);
 void limpiaBuffer(BaseChannel *pSD);
