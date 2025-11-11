@@ -32,18 +32,6 @@ extern "C" {
 
 #define ttyHM10 &SD6
 
-//extern uint16_t modoRadio;
-//extern uint16_t sBeacon;
-//extern uint16_t idLlamador;
-//extern uint16_t dsMaxEntreMsgsLlamador;
-//extern uint16_t dsMinEntreMsgsLlamador;
-//extern uint16_t bloqueoAbusones;
-//extern uint16_t avisaAbuso;
-//extern uint16_t tiempoAbuso;         // minutos
-//extern uint16_t dsMaxEntreMsgsPozo;
-//extern uint16_t dsMinEntreMsgsPozo;
-//extern uint16_t idVacon;
-
 
 bool sdHM10open = false;
 bool hayConectadoHM10;
@@ -58,24 +46,8 @@ float presion;
 
 static const SerialConfig ser_cfg9600 = {9600, 0, 0, 0, };//{115200, 0, 0, 0, };
 static const SerialConfig ser_cfg19200 = {19200, 0, 0, 0, };//{115200, 0, 0, 0, };
-//struct opcion_t {             // Structure declaration
-//    uint16_t *variable;
-//    uint16_t valMin;
-//    uint16_t valMax;
-//    const char descOpcion[];
-//  };
 
 
-//struct opcion_t opcMR   = { &modoRadio, 1 ,3,     "Modo radio (1:llamador, 2:pozo, 3:regist)"};
-//struct opcion_t opcSO   = { &sBeacon, 60 ,1200,   "Tiempo olvido (s)"};
-//struct opcion_t opcID   = { &idLlamador, 1 ,9,    "Id Llamador"};
-//struct opcion_t opcTMLL = { &dsMaxEntreMsgsLlamador, 100 ,3000, "Tiempo max. entre msgs (ds)"};
-//struct opcion_t opcTmLL = { &dsMinEntreMsgsLlamador, 10 ,100, "Tiempo min. entre msgs (ds)"};
-//struct opcion_t opcBLQ  = { &bloqueoAbusones, 0 ,1, "Bloqueo abusones"};
-//struct opcion_t opcAVS =  { &avisaAbuso, 0 ,1, "Avisa abuso"};
-//struct opcion_t opcTAB =  { &tiempoAbuso, 120 ,1200, "Tiempo abuso (min)"};
-//struct opcion_t opcTMPZ = { &dsMaxEntreMsgsPozo, 100 ,3000, "Tiempo max. entre msgs (ds)"};
-//struct opcion_t opcTmPZ = { &dsMinEntreMsgsPozo, 1 ,100, "Tiempo min. entre msgs (ds)"};
 //struct opcion_t opcVacon = { &idVacon, 1 ,100, "Modbus Addr Vacon"};
 
 
@@ -327,11 +299,10 @@ void configHardware(void)
         chprintf(bssHM10,"2 Id Modbus:%d\n",modbusIdHR->getValor());
         chprintf(bssHM10,"3 Baud Modbus:%d\n",modbusBaudHR->getValor());
         chprintf(bssHM10,"4 Bar max. sensor: %.1f\n",barMaxSensPresionHR->getValor());
-        chprintf(bssHM10,"5 Llamacion: %d\n",pideAguaHR->getValor());
-        chprintf(bssHM10,"6 salir\n");
-        result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 6);
+        chprintf(bssHM10,"5 salir\n");
+        result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 5);
         chprintf(bssHM10,"\n");
-        if (result != 0 || (result==0 && opcion==6))
+        if (result != 0 || (result==0 && opcion==5))
             break;
         if (opcion==1)
             cambiaNombreModulo(ttyHM10);
@@ -383,18 +354,22 @@ static THD_FUNCTION(ThreadHM10, arg) {
         int2str(abusonesIR->getValor(), binStr);
         chprintf(bssHM10,"Abuso:%s\n",binStr);
         printHROpciones(bssHM10,modoRadioHR);// printOpcion(ttyOpciones, &opcMR);
-        chprintf(bssHM10,"Presion:%.1f\n",presion);
+        if (modoRadioHR->getValor()==0) // llamador
+            chprintf(bssHM10,"Llamacion:%d\n",miLlamacionIR->getValor());
+        chprintf(bssHM10,"Bomba:%d Presion:%.1f\n",bombaOnIR->getValor(),presion);
         chprintf(bssHM10,"1 Configurar hardware\n");
         chprintf(bssHM10,"2 Modo radio:%s\n",modoRadioHR->getDescripcion());
-        if (modoRadioHR->getValor()==0)
+        if (modoRadioHR->getValor()==0) // llamador
         {
             chprintf(bssHM10,"3 Id Llamador: %d\n",idLlamadorHR->getValor());
             chprintf(bssHM10,"4 Tiempo max entre msgs: %d s\n",sMaxEntreMsgsLlamadorHR->getValor());
             chprintf(bssHM10,"5 Tiempo min entre msgs: %d ds\n",dsMinEntreMsgsLlamadorHR->getValor());
-            chprintf(bssHM10,"6 salir\n");
-            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 6);
+            chprintf(bssHM10,"6 Llamacion por: %s\n",usaSensorHR->getDescripcion());
+            chprintf(bssHM10,"7 Llamacion MB: %d\n",pideAguaHR->getValor());
+            chprintf(bssHM10,"8 salir\n");
+            result = preguntaNumeroHM10(bcHM10, "Dime opcion", &opcion, 1, 8);
             chprintf(bssHM10,"\n");
-            if (result != 0 || (result==0 && opcion==6))
+            if (result != 0 || (result==0 && opcion==8))
                 continue;
             if (opcion==1)
                 configHardware();
@@ -411,6 +386,10 @@ static THD_FUNCTION(ThreadHM10, arg) {
                 ajustaNumero(ttyHM10, sMaxEntreMsgsLlamadorHR);
             if (opcion==5)
                 ajustaNumero(ttyHM10, dsMinEntreMsgsLlamadorHR);
+            if (opcion==6)
+                ajustaSeleccion(ttyHM10, usaSensorHR);
+            if (opcion==7)
+                ajustaNumero(ttyHM10, pideAguaHR);
         }
         else if (modoRadioHR->getValor()==1)
         {

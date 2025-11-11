@@ -47,7 +47,7 @@ extern "C"
 
 registrador::registrador(void)
 {
-    bombaPozoOn = 0;
+    bombaOnIR->setValor(0);
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoComms = 0;
 }
@@ -76,12 +76,12 @@ uint8_t registrador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlama
     uint8_t estadoLlamacionesOld, estadoActivosOld, petBombaOld;
     estadoLlamacionesOld = peticionesIR->getValor();
     estadoActivosOld = activosIR->getValor();
-    petBombaOld = bombaPozoOn; //estados::diEstado(numInput);//petBomba;
+    petBombaOld = bombaOnIR->getValor(); //estados::diEstado(numInput);//petBomba;
     peticionesIR->setValor(estadoLlamacionesMsg);
     activosIR->setValor(estadoActivosMsg);
     estadoAbusonesOld = abusonesIR->getValor();
-    bombaPozoOn = petBombaMsg;
-    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaPozoOn!=petBombaOld)
+    bombaOnIR->setValor(petBombaMsg);
+    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaOnIR->getValor()!=petBombaOld)
     {
         return 1;
     }

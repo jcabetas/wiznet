@@ -76,7 +76,7 @@ int32_t randomNum(int32_t numMin, int32_t numMax)
 llamador::llamador(void)
 {
 //    modoRadio = MODOLLAMADOR;
-    bombaPozoOn = 0;
+    bombaOnIR->setValor(0);
     bombaPozoSolicitada = 0;
     calendar::getFechaHora(&dateTimeRxPozoAnterior);
     estadoDeseado = 0;
@@ -114,7 +114,7 @@ void llamador::enviaStatusLlamacion(void)
     chsnprintf(buffer,sizeof(buffer),"Envio llamacion:%d",estadoDeseado);
     escribeLCD(buffer);
     calendar::printHora(buffer,sizeof(buffer));
-    chprintf((BaseSequentialStream *)&SD1,"%s  Envio llamacion:%d\n",buffer,estadoDeseado);
+    chprintf((BaseSequentialStream *)&SD1,"=> Tx %s  Envio llamacion:%d\n",buffer,estadoDeseado);
 }
 
 
@@ -151,13 +151,13 @@ uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacio
     uint8_t estadoLlamacionesOld, estadoActivosOld, petBombaOld;
     estadoLlamacionesOld = peticionesIR->getValor(); // estadoLlamaciones
     estadoActivosOld = activosIR->getValor(); // estadoActivos
-    petBombaOld = bombaPozoOn; //estados::diEstado(numInput);//petBomba;
+    petBombaOld = bombaOnIR->getValor(); //estados::diEstado(numInput);//petBomba;
     peticionesIR->setValor(estadoLlamacionesMsg);
     uint8_t miId = idLlamadorHR->getValor();      // Id llamador
     uint8_t estoyConectadoOld = (activosIR->getValor()>>(miId-1)) & 1;
     activosIR->setValor(estadoActivosMsg);
     estadoAbusonesOld = abusonesIR->getValor();
-    bombaPozoOn = petBombaMsg;
+    bombaOnIR->setValor(petBombaMsg);
     uint8_t yoEstabaPidiendoMsg = (estadoLlamacionesMsg>>(miId-1)) & 1;
     uint8_t estoyConectadoMsg = (estadoActivosMsg>>(miId-1)) & 1;
     // miro si el pozo tiene mal mi peticion y le tengo que informar de mi estado, o bien dice que no existo
@@ -173,13 +173,14 @@ uint8_t llamador::gestionaEstadoPozo(uint8_t petBombaMsg, uint8_t estadoLlamacio
     {
         numEstadoComOk = estoyConectadoMsg;
     }
-    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaPozoOn!=petBombaOld)
+    if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || bombaOnIR->getValor()!=petBombaOld)
     {
         return 1;
     }
     else
         return 0;
 }
+
 
 void llamador::trataRx(struct msgRx_t *msgRx)
 {
@@ -196,6 +197,11 @@ void llamador::trataRx(struct msgRx_t *msgRx)
     //    Byte 2: Estado bomba del Pozo '0' '1'
     //    Byte 3: Array de 8 bits indicando si el Pozo reconoce como activos a cada uno de los llamadores. Para ello el satelite ha de transmitir como mucho cada 15 segundos
     //    Byte 4: Array de 8 bits indicando si el Pozo ha recibido una senyal de llamacion de un satelite. Se distribuye a todo el mundo, para que todos puedan saber la situacion
+    chprintf((BaseSequentialStream *)&SD1,"<= Rx rssi:%d %d bytes: [", msgRx->rssi, msgRx->numBytes);
+    for (uint8_t i=1;i<=msgRx->numBytes;i++)
+        chprintf((BaseSequentialStream *)&SD1," %02x",msgRx->msg[i-1]);
+    chprintf((BaseSequentialStream *)&SD1,"]\n");
+
     if (msgId==MSG_STATUSPOZO && msgRx->numBytes==5 && msgRx->msg[1]==0 && (msgRx->msg[2] == '0' || msgRx->msg[2] =='1'))
     {
         uint8_t numEstMsg = msgRx->msg[1];
@@ -212,7 +218,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             chsnprintf(buffer,sizeof(buffer),"Pozo B:%d RSSI:%d", petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
             calendar::printHora(buffer,sizeof(buffer));
-            chprintf((BaseSequentialStream *)&SD1,"%s  Pozo Bomba:%d RSSI:%d\n",buffer, petBombaMsg, msgRx->rssi);
+            chprintf((BaseSequentialStream *)&SD1,"   %s  Pozo Bomba:%d RSSI:%d\n",buffer, petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d de pozo", fechHora.tm_min, fechHora.tm_sec, getCntRx());
 //            chLcdprintfFila(1,"Bomba:%d RSSI:%d", petBombaMsg, msgRx->rssi);
 //            chLcdprintfFila(2,"Bomba:%d",petBombaMsg);
@@ -230,7 +236,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEstMsg,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
             calendar::printHora(buffer,sizeof(buffer));
-            chprintf((BaseSequentialStream *)&SD1,"%s  #%d Llamacion:%d RSSI:%d\n",buffer,numEstMsg,petBombaMsg, msgRx->rssi);
+            chprintf((BaseSequentialStream *)&SD1,"   %s  #%d Llamacion:%d RSSI:%d\n",buffer,numEstMsg,petBombaMsg, msgRx->rssi);
 //            chsnprintf(buffer,sizeof(buffer),"%02d:%02d Msg%02d de #%d",fechHora.tm_min, fechHora.tm_sec, getCntRx(), numEstMsg);
 //            chLcdprintfFila(0,buffer);
 //            chsnprintf(buffer,sizeof(buffer),"Llamacion:%d RSSI:%d\n", petBombaMsg, msgRx->rssi);
@@ -270,7 +276,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Abusa #%d msg:'%s'",estProblematica,bufError);
             escribeLCD(buffer);
-            chprintf((BaseSequentialStream *)&SD1,"%d Abusa #%d msg:'%s'\n",calendar::getSecUnix(),estProblematica,bufError);
+            chprintf((BaseSequentialStream *)&SD1,"   %d Abusa #%d msg:'%s'\n",calendar::getSecUnix(),estProblematica,bufError);
 //            chLcdprintfFila(0,"%02d:%02d Msg%02d Abusa #%d", fechHora.tm_min, fechHora.tm_sec, getCntRx(), estProblematica);
 //            chLcdprintfFila(1,"msg:'%s'",bufError);
         }
@@ -303,7 +309,7 @@ void llamador::trataRx(struct msgRx_t *msgRx)
             calendar::gettm(&fechHora);
             chsnprintf(buffer,sizeof(buffer),"Deja de abusar #%d", estProblematica);
             escribeLCD(buffer);
-            chprintf((BaseSequentialStream *)&SD1,"%d Deja de abusar #%d\n", calendar::getSecUnix(),estProblematica);
+            chprintf((BaseSequentialStream *)&SD1,"   %d Deja de abusar #%d\n", calendar::getSecUnix(),estProblematica);
 //            chLcdprintfFila(1,"");
         }
     }
@@ -334,6 +340,7 @@ void llamador::stop(void)
 void llamador::update(uint8_t estadoDeseadoPar)
 {
     estadoDeseado = estadoDeseadoPar;
+    miLlamacionIR->setValor(estadoDeseadoPar);
     if (estadoDeseado != bombaPozoSolicitada)
     {
         if (calendar::dsDiff(&dateTimeEnvioAnterior)>(uint32_t)dsAleatorioMinEntreMsgsLlamador)
@@ -358,7 +365,10 @@ static THD_FUNCTION(ThreadSensor, arg) {
     nuevoEstado = !palReadLine(LINE_SENSOR);
     msNuevoEstado = 0;
     while(!chThdShouldTerminateX()) {
-        nuevoEstado = pideAguaHR->getValor(); //!palReadLine(LINE_SENSOR);
+        if (usaSensorHR->getValor()==0) // 0: modbus, 1: sensor
+            nuevoEstado = pideAguaHR->getValor();
+        else
+            nuevoEstado = !palReadLine(LINE_SENSOR);
         if (nuevoEstado != estadoDeseadoSensor)
         {
             msNuevoEstado += 100;

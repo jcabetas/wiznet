@@ -57,6 +57,29 @@ void ponEnLCD(uint8_t fila, char const msg[]);
 
 extern struct queu_t colaMsgRx, colaMsgTx;
 
+static virtual_timer_t ledRojo_vt;
+static virtual_timer_t ledBlanco_vt;
+
+static void ledRojo_off(virtual_timer_t *, void *)
+{
+    palSetLine(LINE_LED1);       // apaga ledRojo
+}
+
+void blinkledRojo(void) {
+  palClearLine(LINE_LED1);       // enciende led 1
+  chVTSet(&ledRojo_vt, TIME_MS2I(50), ledRojo_off, NULL);
+}
+
+static void ledBlanco_off(virtual_timer_t *, void *)
+{
+    palSetLine(LINE_LED2);       // apaga ledBlanco
+}
+
+void blinkledBlanco(void) {
+  palClearLine(LINE_LED2);       // enciende led 2
+  chVTSet(&ledBlanco_vt, TIME_MS2I(50), ledBlanco_off, NULL);
+}
+
 /*
  * Interrupciones rf95. Activa proceso rf95int para leer datos
  */
@@ -85,6 +108,7 @@ void procesaRx(void)
         putQueu(&colaMsgRx, &msgRx);
         bufLen = 0;
         chEvtBroadcast(&newMsgRx_source);
+        blinkledRojo();
     }
 }
 
@@ -137,6 +161,7 @@ static THD_FUNCTION(trataRf95, p) {
             if(getQueu(&colaMsgTx, &msgTx))
             {
                 rf95.send(msgTx.msg,msgTx.numBytes);
+                blinkledBlanco();
             }
         }
     } while (1==1);
@@ -163,6 +188,13 @@ void initRF95(void)
 {
     if (procesoRf95Int!=NULL) // debe haber sido arrancado antes
         return;
+    /* LED timer initialization.*/
+    chVTObjectInit(&ledRojo_vt);
+    chVTObjectInit(&ledBlanco_vt);
+    palClearLine(LINE_LED1);
+    palClearLine(LINE_LED2);
+    palSetLineMode(LINE_LED1, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetLineMode(LINE_LED2, PAL_MODE_OUTPUT_PUSHPULL);
     initSpi3Pins();
     spiStart(&SPID3, &spicfgRF95);
     palSetLine(LINE_NSS);

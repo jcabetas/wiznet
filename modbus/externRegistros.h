@@ -20,13 +20,16 @@ extern holdingRegisterInt *minutosAbusoHR;   //
 extern holdingRegisterInt *sMaxEntreMsgsPozoHR;  // s maximo entre mensajes en modo pozo
 extern holdingRegisterInt *dsMinEntreMsgsPozoHR; // ds minimo entre mensajes en modo pozo
 extern holdingRegisterFloat *barMaxSensPresionHR;     // *10
-extern holdingRegisterInt *pideAguaHR;           // pide agua
+extern holdingRegisterOpciones *usaSensorHR;     // control peticion agua modo llamador (0: modbus, 1: sensor)
+extern holdingRegisterInt *pideAguaHR;           // peticion agua por modbus (modo llamador)
 
 
 extern inputRegister *activosIR;        // estaciones activos
 extern inputRegister *peticionesIR;
 extern inputRegister *abusonesIR;
 extern inputRegister *presBarIR;        // *100
+extern inputRegister *bombaOnIR;
+extern inputRegister *miLlamacionIR;
 
 
 #endif /* MODBUS_EXTERNREGISTROS_H_ */

@@ -17,8 +17,11 @@ using namespace chibios_rt;
 #include "modbus.h"
 #include "registros.h"
 #include "lcd.h"
+#include "radio.h"
 
-
+thread_t *slaveMBThread = NULL;
+modbusSlave *controlMB;
+extern pozo *pozoObj;
 
 extern "C" {
     uint8_t initModbusSlave(void);
@@ -31,6 +34,7 @@ extern "C" {
 
 uint32_t modbusSpeed[10] = {300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
 const char *modoStr[10] = {"llamador","pozo","registrador"};
+const char *llamacionStr[10] = {"modbus","sensor"};
 
 
 holdingRegisterInt *modbusIdHR;           // Id modbus
@@ -45,7 +49,20 @@ holdingRegisterInt *minutosAbusoHR;   //
 holdingRegisterInt *sMaxEntreMsgsPozoHR;  // s maximo entre mensajes en modo pozo
 holdingRegisterInt *dsMinEntreMsgsPozoHR; // ds minimo entre mensajes en modo pozo
 holdingRegisterFloat *barMaxSensPresionHR;     // *10
-holdingRegisterInt *pideAguaHR;           // pide agua
+holdingRegisterOpciones *usaSensorHR;     // control peticion agua modo llamador (0: modbus, 1: sensor)
+holdingRegisterInt *pideAguaHR;           // peticion agua por modbus (modo llamador)
+holdingRegisterInt *hanPedidoAguaHR;      // pide agua (modo pozo)
+
+bool checkAbusones(uint16_t nuevoValorInterno)
+{
+    // elimina bloqueos actuales
+    if (bloqueaAbusonesHR->getValor()==1 && nuevoValorInterno==0 && modoRadioHR->getValor()==1)
+        pozoObj->quitaTodosLosAbusos();
+    if (bloqueaAbusonesHR->getValor()==0 && nuevoValorInterno==1 && modoRadioHR->getValor()==1)
+        pozoObj->quitaTiemposPeticion();
+    return false;
+}
+
 
 void initHoldingRegistersControl(modbusSlave *modbusControl)
 {
@@ -58,11 +75,12 @@ void initHoldingRegistersControl(modbusSlave *modbusControl)
 
    sMaxEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T refresco (s)", 10, 36000, 60, true); // tiempo maximo llamadores sin enviar estado peticion
    dsMinEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T intermsg (ds)", 5, 100, 30, true);  // tiempo minimo llamadores entre mensajes
-   bloqueaAbusonesHR = modbusControl->addHoldingRegisterInt("Bloquea abuso", 0, 1, 1, true);
-   minutosAbusoHR = modbusControl->addHoldingRegisterInt("Abuso minutos", 30, 1440, 720, true);
+   bloqueaAbusonesHR = modbusControl->addHoldingRegisterInt("Bloquea abuso", 0, 1, 1, true,checkAbusones);
+   minutosAbusoHR = modbusControl->addHoldingRegisterInt("Abuso minutos", 1, 1440, 720, true);
    sMaxEntreMsgsPozoHR = modbusControl->addHoldingRegisterInt("T refresco pozo (s)", 5, 180,5, true); // tiempo maximo pozo sin enviar estados
    dsMinEntreMsgsPozoHR = modbusControl->addHoldingRegisterInt("T interrmsg pozo (ds)", 5, 100, 20, true);    // tiempo minimo pozo entre estados
    barMaxSensPresionHR = modbusControl->addHoldingRegisterFloat("Bar max sensor*10", 1.0, 16.0, 8.0, 10.0f, true);
+   usaSensorHR = modbusControl->addHoldingRegisterOpciones("Control llamacion",llamacionStr,2, 0, true);
    pideAguaHR = modbusControl->addHoldingRegisterInt("Llamacion MB", 0, 1, 0, false);
 }
 
@@ -71,7 +89,8 @@ inputRegister *activosIR;        // estaciones activos
 inputRegister *peticionesIR;
 inputRegister *abusonesIR;
 inputRegister *presBarIR;        // *100
-
+inputRegister *bombaOnIR;
+inputRegister *miLlamacionIR;
 
 void initInputRegistersControl(modbusSlave *modbusControl)
 {
@@ -80,11 +99,11 @@ void initInputRegistersControl(modbusSlave *modbusControl)
    peticionesIR = modbusControl->addInputRegister("Peticiones");
    abusonesIR = modbusControl->addInputRegister("Abusones");
    presBarIR = modbusControl->addInputRegister("Presion");            // *100
+   bombaOnIR = modbusControl->addInputRegister("Bomba");
+   miLlamacionIR = modbusControl->addInputRegister("Llamacion");
 }
 
 
-thread_t *slaveMBThread = NULL;
-modbusSlave *controlMB;
 
 static THD_WORKING_AREA(wamodbus, 3000);
 static THD_FUNCTION(modbusThrd, arg) {

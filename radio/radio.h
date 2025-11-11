@@ -65,7 +65,7 @@ class radio
 {
 protected:
 //    ModoRadio modo;  // modoRadio
-    uint16_t bombaPozoOn;                                             // segun mensajes del pozo
+//    uint16_t bombaPozoOn;                                             // segun mensajes del pozo
     uint16_t numEstadoComOk, numEstadoBomba;
 //    uint8_t estadoLlamaciones, estadoActivos, estadoAbusones;  // segun pozo
     uint8_t estadoAbusonesOld;
@@ -90,6 +90,7 @@ public:
     void reseteaHistoriaPozo(void);
     void reseteaVariables(void);
     void reseteaVariablesEspecificas(void);
+    static void reseteaAbuso(void);
     static void arrancaRadio(void);
     static void paraRadio(void);
     static uint8_t radioDefinida(void);
@@ -152,6 +153,8 @@ public:
     const char *diTipo(void);
     void reseteaVariables(void);
     uint8_t quitarAbuso(uint8_t numEstacion);
+    void quitaTodosLosAbusos(void);
+    void quitaTiemposPeticion(void);
     void onCambioParametrosPozo(void);
     uint8_t buscoSlot(uint8_t numError, uint8_t numEstacion, uint8_t *slot);
     void actualizoErrorDesdeLlamador(uint8_t numEstacion, uint8_t numError, uint8_t *msgError);

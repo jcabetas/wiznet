@@ -35,7 +35,7 @@ radio::radio(void)
     cntRx = 0;
     //calendar::getFechaHora(&dateTimeEnvioAnterior);
     dateTimeEnvioAnterior = {};
-    bombaPozoOn = 0;
+    bombaOnIR->setValor(0);
 }
 
 void radio::escribeLCD(const char *msgLin3)
@@ -45,7 +45,7 @@ void radio::escribeLCD(const char *msgLin3)
         strncpy(statAbuso,"     ",sizeof(statAbuso));
     else
         strncpy(statAbuso,"ABUSO",sizeof(statAbuso));
-    chLcdprintfFila(0,"%2d Bomba:%d %5s",cntRx, bombaPozoOn, statAbuso);
+    chLcdprintfFila(0,"%2d Bomba:%d %5s",cntRx, bombaOnIR->getValor(), statAbuso);
     int2str(peticionesIR->getValor(), binStr);
     chLcdprintfFila(1,"Piden:%s",binStr);
     int2str(activosIR->getValor(), binStr);

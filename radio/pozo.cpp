@@ -66,7 +66,7 @@ void int2str(uint8_t valor, char *string);
  */
 
 
-
+pozo *pozoObj;
 thread_t *procesoPozo = NULL;
 
 
@@ -84,9 +84,11 @@ pozo::pozo(void)
 {
     reseteaVariablesEspecificas();
     palSetLineMode(LINE_RELE, PAL_MODE_OUTPUT_PUSHPULL);
-    bombaPozoOn = 0;
+    bombaOnIR->setValor(0);
     palClearLine(LINE_RELE);
 }
+
+//void pozo:arrancaRadio(void);
 
 
 void pozo::reseteaVariablesEspecificas(void)
@@ -111,7 +113,7 @@ void pozo::reseteaVariablesEspecificas(void)
 
 
 /*
- *  Pone error en su slot coorespondiente
+ *  Pone error en su slot correspondiente
  */
 int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
 {
@@ -130,6 +132,7 @@ int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
     // actualizo time y mensaje del slot
     timeInicioAvisoError[slot] = calendar::getSecUnix();
     //calendar::getFecha(&ahora);
+    calendar::printHora((char *)mensajeAviso[slot],sizeof(mensajeAviso[slot]));
     //chsnprintf((char *)mensajeAviso[slot],sizeof(mensajeAviso[slot]),"%d/%d %d:%d",ahora.tm_mday, ahora.tm_mon+1,ahora.tm_hour,ahora.tm_min);
     return slot;
 }
@@ -138,7 +141,7 @@ int8_t pozo::actualizoErrorDesdePozo(uint8_t numEstacion)
 uint8_t pozo::quitarAbuso(uint8_t numEstacion)
 {
     time_t ahora;
-    char buffer[30];
+    char buffer[15];
     if (numEstacion==0 || numEstacion>8 || modoRadioHR->getValor()!=1)
         return 1;
     uint16_t estAbus = abusonesIR->getValor();
@@ -146,11 +149,35 @@ uint8_t pozo::quitarAbuso(uint8_t numEstacion)
     abusonesIR->setValor(estAbus);
     enviaClearErrorPozo(1, numEstacion);
     limpiaError(numEstacion, 1);
-    ahora = GetTimeUnixSec();
+    ahora = calendar::getSecUnix(); //GetTimeUnixSec();
     timeInicioPeticion[numEstacion-1] =  ahora; // reinicio temporizador
     calendar::printHora(buffer,sizeof(buffer));
     chprintf((BaseSequentialStream *)&SD1,"%s  #%d le quito abuso\n",buffer,numEstacion);
     return 0;
+}
+
+
+void pozo::quitaTiemposPeticion(void)
+{
+    time_t ahora = calendar::getSecUnix();
+    for (uint8_t est=1;est<=8;est++)
+    {
+        timeInicioPeticion[est-1] =  ahora; // reinicio temporizador
+    }
+}
+
+
+
+void pozo::quitaTodosLosAbusos(void)
+{
+    uint16_t estAbusan = abusonesIR->getValor();
+    for (uint8_t est=1;est<=8;est++)
+    {
+        uint8_t abusa = (estAbusan>>(est-1)) & 1;
+        if (abusa)
+            quitarAbuso(est);
+    }
+    abusonesIR->setValor(0);
 }
 
 void pozo::enviaStatusPozo(void)
@@ -160,7 +187,7 @@ void pozo::enviaStatusPozo(void)
     msgTx.numBytes = 5;
     msgTx.msg[0] = MSG_STATUSPOZO;
     msgTx.msg[1] = 0;                   // Id Pozo
-    if (bombaPozoOn == 1)
+    if (bombaOnIR->getValor() == 1)
         msgTx.msg[2] = '1';
     else
         msgTx.msg[2] = '0';
@@ -171,10 +198,11 @@ void pozo::enviaStatusPozo(void)
     if (++cntTx>99)
         cntTx = 0;
     calendar::getFechaHora(&dateTimeEnvioAnterior);
-    chsnprintf(buffer,sizeof(buffer),"Envio estado:%d",bombaPozoOn);
+    chsnprintf(buffer,sizeof(buffer),"Envio estado:%d",bombaOnIR->getValor());
     escribeLCD(buffer);
     calendar::printHora(buffer,sizeof(buffer));
-    chprintf((BaseSequentialStream *)&SD1,"%s  Envio estado\n",buffer);
+    chprintf((BaseSequentialStream *)&SD1,"Tx %s  envio estado B:%d Act:%d\n",
+             buffer,bombaOnIR->getValor(),activosIR->getValor());
 }
 
 // Formato del mensaje:
@@ -187,6 +215,7 @@ void pozo::enviaStatusPozo(void)
 void pozo::enviaErrorPozo(uint8_t slot) //uint8_t numError, uint8_t numEstProblematica, uint8_t *msg)
 {
     struct msgTx_t msgTx;
+    char buffer[15];
     msgTx.msg[0] = MSG_ERROR;
     msgTx.msg[1] = 0;                   // Id Pozo
     msgTx.msg[2] = numErrorAviso[slot];
@@ -196,10 +225,13 @@ void pozo::enviaErrorPozo(uint8_t slot) //uint8_t numError, uint8_t numEstProble
         len = 20;
     msgTx.msg[4] = len;
     memcpy(&msgTx.msg[5], mensajeAviso[slot], len);
-    msgTx.msg[4+len] = 0;
-    msgTx.numBytes = 4+len+1;           // incluye 0 final de string
+    msgTx.msg[5+len] = 0;
+    msgTx.numBytes = 5+len+1;           // incluye 0 final de string
     putQueu(&colaMsgTx, &msgTx);
     chEvtBroadcast(&newMsgTx_source);
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"Tx %s  envio error en pozo numErr:%d Est:%d msg:'%s'\n",
+             buffer,msgTx.msg[2],msgTx.msg[3],&msgTx.msg[5]);
 }
 
 // Formato del mensaje:
@@ -211,6 +243,7 @@ void pozo::enviaErrorPozo(uint8_t slot) //uint8_t numError, uint8_t numEstProble
 void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
 {
     struct msgTx_t msgTx;
+    char buffer[15];
     msgTx.numBytes = 4;
     msgTx.msg[0] = MSG_CLEARERROR;
     msgTx.msg[1] = 0;                   // Id Pozo
@@ -218,6 +251,8 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
     msgTx.msg[3] = numEstProblematica;
     putQueu(&colaMsgTx, &msgTx);
     chEvtBroadcast(&newMsgTx_source);
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"Tx %s  envio clear error en pozo numErr:%d Est:%d\n",buffer,numError,numEstProblematica);
 }
 
 /*
@@ -226,9 +261,9 @@ void pozo::enviaClearErrorPozo(uint8_t numError, uint8_t numEstProblematica)
 void pozo::updateEstadoBomba(void) // estadoPeticionBomba
 {
     if (bloqueaAbusonesHR->getValor())
-        bombaPozoOn = ((peticionesIR->getValor() & ~abusonesIR->getValor())>0);
+        bombaOnIR->setValor((peticionesIR->getValor() & ~abusonesIR->getValor())>0);
     else
-        bombaPozoOn = (peticionesIR->getValor()>0);
+        bombaOnIR->setValor(peticionesIR->getValor()>0);
 }
 
 /*
@@ -238,23 +273,26 @@ void pozo::updateEstadoBomba(void) // estadoPeticionBomba
 uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
 {
     uint8_t estadoLlamacionesOld, estadoActivosOld, estadoAbusonesOld, estadoBombaOld;
-//    char nombre[20], telef[15];
-//    struct tm fechaIni;
+    char buffer[15];
     estadoLlamacionesOld = peticionesIR->getValor();
     estadoActivosOld = activosIR->getValor();
     estadoAbusonesOld = abusonesIR->getValor();
-    estadoBombaOld = bombaPozoOn;
+    estadoBombaOld = bombaOnIR->getValor();
     uint8_t estacionMsgMenosUno = estacionMsg-1;
     time_t ahora = calendar::getSecUnix();
     timeUltConexion[estacionMsgMenosUno] = ahora;
     activosIR->setValor(activosIR->getValor() | (1<<estacionMsgMenosUno)); //    estadoActivos |= (1<<estacionMsgMenosUno);
     uint8_t estabaPidiendo = (peticionesIR->getValor()>>estacionMsgMenosUno) & 1;
+    if (!estabaPidiendo && petBombaMsg)  // ha empezado a pedir?
+        timeInicioPeticion[estacionMsgMenosUno] = ahora;
     uint8_t estabaAbusando = (abusonesIR->getValor()>>estacionMsgMenosUno) & 1;
-    if (!bloqueaAbusonesHR->getValor() && estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
+    calendar::printHora(buffer,sizeof(buffer));
+    if (estabaPidiendo && !petBombaMsg && estabaAbusando)  // abusador que deja de pedir
     {
         abusonesIR->setValor(abusonesIR->getValor() & ~(1<<estacionMsgMenosUno));  // si abusaba, ya no
         enviaClearErrorPozo(1, estacionMsg);
         limpiaError(estacionMsg, 1);
+        chprintf((BaseSequentialStream *)&SD1,"%s  Limpia error est:%d\n",buffer,estacionMsg);
     }
     // posible abuso?
     if (bloqueaAbusonesHR->getValor() && !estabaAbusando && estabaPidiendo && petBombaMsg
@@ -263,6 +301,8 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
         abusonesIR->setValor(abusonesIR->getValor() | (1<<estacionMsgMenosUno));
         uint8_t slot = actualizoErrorDesdePozo(estacionMsg);
         enviaErrorPozo(slot);
+        chprintf((BaseSequentialStream *)&SD1,"%s  Envio error est:%d\n",buffer,estacionMsg);
+
 //        if (avisaAbuso && bloqueaAbusonesHR->getValor())
 //        {
             // ToDo avisa abuso por SMS
@@ -280,9 +320,9 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
         peticionesIR->setValor(peticionesIR->getValor() | (1<<(estacionMsgMenosUno)));
     updateEstadoBomba();
     if (peticionesIR->getValor()!=estadoLlamacionesOld || activosIR->getValor()!=estadoActivosOld || abusonesIR->getValor()!=estadoAbusonesOld
-            || estadoBombaOld!=bombaPozoOn)
+            || estadoBombaOld!=bombaOnIR->getValor())
     {
-        if (bombaPozoOn)
+        if (bombaOnIR->getValor())
             palSetLine(LINE_RELE);
         else
             palClearLine(LINE_RELE);
@@ -297,10 +337,11 @@ uint8_t pozo::gestionaPeticionPozo(uint8_t estacionMsg, uint8_t petBombaMsg)
  */
 void pozo::obsoleto(void)
 {
+    char buffer[15];
     // llevan mucho tiempo sin conexion?
     uint8_t envioEstado = 0;
     uint8_t hayCambios = 0;
-    char buffer[30];
+    calendar::rtcGetFecha();
     for (uint8_t disp=0;disp<NUMSATELITES;disp++)
     {
         uint8_t estabaActivo = (activosIR->getValor()>>disp) & 1;
@@ -311,7 +352,6 @@ void pozo::obsoleto(void)
             peticionesIR->setValor(peticionesIR->getValor() & ~(1<<disp));
             envioEstado = 1;
             hayCambios = 1;
-            calendar::printHora(buffer,sizeof(buffer));
             chprintf((BaseSequentialStream *)&SD1,"%s  #%d sin mensajes desde %d segundos\n",buffer,disp,calendar::sDiff(&timeUltConexion[disp]));
         }
     }
@@ -324,7 +364,7 @@ void pozo::obsoleto(void)
     if (hayCambios)
     {
         updateEstadoBomba();
-        if (bombaPozoOn)
+        if (bombaOnIR->getValor())
             palSetLine(LINE_RELE);
         else
             palClearLine(LINE_RELE);
@@ -358,6 +398,13 @@ void pozo::trataRx(struct msgRx_t *msgRx)
     }
     if (++cntRx>99)
         cntRx = 0;
+    // imprimo mensaje
+    calendar::printHora(buffer,sizeof(buffer));
+    chprintf((BaseSequentialStream *)&SD1,"Rx %s rssi:%d %d bytes: [", buffer, msgRx->rssi, msgRx->numBytes);
+    for (uint8_t i=1;i<=msgRx->numBytes;i++)
+        chprintf((BaseSequentialStream *)&SD1," %02x",msgRx->msg[i-1]);
+    chprintf((BaseSequentialStream *)&SD1,"]\n");
+
     if (msgId==MSG_STATUSLLAMACIONLOCAL && msgRx->numBytes==3)
     {
         numEst = msgRx->msg[1];
@@ -371,10 +418,10 @@ void pozo::trataRx(struct msgRx_t *msgRx)
                 enviaStatusPozo();
             }
             memcpy(&ultMsg, msgRx, sizeof(ultMsg));
-            chsnprintf(buffer,sizeof(buffer),"#%d Llam:%d RSSI:%d",numEst,petBombaMsg, msgRx->rssi);
+            chsnprintf(buffer,sizeof(buffer),"  #%d Llam:%d RSSI:%d",numEst,petBombaMsg, msgRx->rssi);
             escribeLCD(buffer);
             calendar::printHora(buffer,sizeof(buffer));
-            chprintf((BaseSequentialStream *)&SD1,"%s  #%d Llam:%d RSSI:%d\n",buffer,numEst,petBombaMsg, msgRx->rssi);
+            chprintf((BaseSequentialStream *)&SD1,"   Est#%d Llam:%d\n",numEst,petBombaMsg);
         }
     }
 }
@@ -404,7 +451,7 @@ void pozo::stop(void)
 
 
 
-pozo *pozoObj;
+
 
 /*
  * Gestor pozo
