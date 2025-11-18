@@ -135,7 +135,7 @@ void llamador::obsoleto(void)
     if (calendar::dsDiff(&dateTimeEnvioAnterior) > 10*sAleatorioBacon)
     {
         enviaStatusLlamacion();
-        sAleatorioBacon = sMaxEntreMsgsLlamadorHR->getValor() + randomNum(0,10);
+        sAleatorioBacon = sMaxEntreMsgsLlamadorHR->getValor() + randomNum(0,2);
     }
 }
 

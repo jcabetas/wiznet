@@ -1,9 +1,0 @@
-# Prueba flujo
-#
-NEXTION 115200 logPLC.ajustes tmpVar.base blank 300
-#
-FECHA base year mes dia hora min
-#
-MEDIDA caudal 0 1
-MEDIDA litRiego 0 0
-CONTADOR 1 litRiego caudal minCaudal

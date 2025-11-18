@@ -21,24 +21,6 @@ using namespace chibios_rt;
 #include "externRegistros.h"
 
 
-void vuelcaLCD(uint8_t lineaIni, const char *msg, uint8_t *buff, uint16_t numBytes)
-{
-    char buffLCD[21];
-    char buffDigit[4];
-    ponEnColaLCD(lineaIni,msg);
-    buffLCD[0] = 0;
-    for (uint8_t i=0;i<numBytes;i++)
-    {
-        snprintf(buffDigit,sizeof(buffDigit),"%X ", buff[i]);
-        strncat(buffLCD, buffDigit,sizeof(buffLCD));
-    }
-    for (uint8_t i=strlen(buffLCD);i<sizeof(buffLCD)-1;i++)
-        buffLCD[i] = ' ';
-    buffLCD[sizeof(buffLCD)-1] = 0;
-    ponEnColaLCD(lineaIni+1,buffLCD);
-    buffLCD[0] = 0;
-}
-
 
 modbusSlave::modbusSlave(SerialDriver *SDpar, ioline_t rxtxLinePar)
 {
@@ -117,7 +99,6 @@ bool modbusSlave::interpretoFunction04(uint8_t myId, uint8_t *buffer, uint16_t b
     buffTx[3+2*numbOfPoints] = (msgCRC & 0xFF);
     buffTx[4+2*numbOfPoints] = (msgCRC & 0xFF00) >> 8;
     envioStrModbus(buffTx, 5+2*numbOfPoints, chTimeMS2I(500));
-//    vuelcaLCD(2, "Es FC04, envio",buffTx, 4+2*numbOfPoints);
     return true;
 }
 
@@ -154,7 +135,6 @@ bool modbusSlave::interpretoFunction06(uint8_t myId, uint8_t *buffer, uint16_t b
     buffTx[6] = (msgCRC & 0xFF);
     buffTx[7] = (msgCRC & 0xFF00) >> 8;
     envioStrModbus(buffTx, 8, chTimeMS2I(500));
-//    vuelcaLCD(2, "Es FC06, envio",buffTx, 8);
     return true;
 }
 
@@ -219,7 +199,6 @@ bool modbusSlave::interpretoFunction16(uint8_t myId, uint8_t *buffer, uint16_t b
 bool modbusSlave::interpretaMsg(uint8_t contador, uint8_t *buffer, uint16_t bytesReceived)
 {
     bool exito;
-    char buffLCD[120];
     // va dirigido a nosotros?
     uint8_t myId =modbusIdHR->getValor();
     if (buffer[0] != myId)
@@ -246,8 +225,7 @@ bool modbusSlave::interpretaMsg(uint8_t contador, uint8_t *buffer, uint16_t byte
       default:
           exito = errorMB(myId, buffer,1);
     }
-    snprintf(buffLCD,sizeof(buffLCD),"Rx FC%02d #%d", funct, contador);
-    ponEnColaLCD(3,buffLCD);
+    chLcdprintfFila(3,"Rx MB FC%02d #%d", funct, contador);
     return exito;
 }
 

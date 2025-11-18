@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include "calendarUTC.h"
+#include "colas.h"
 
 #define SEEDHISTORICO    5674
 
@@ -30,6 +31,8 @@ extern "C" {
     void arrancaRadioC(void);
 }
 void int2str(uint8_t valor, char *string);
+void initColaMsgRx(void);
+void initColaMsgTx(void);
 
 struct datosIdGuardados
 {
@@ -53,6 +56,17 @@ struct datosPozoGuardados
     struct datosIdGuardados datosId[8];
 };
 
+struct msgRx_t {
+  time_t timet;
+  uint8_t numBytes;
+  int16_t rssi;
+  uint8_t msg[30];
+};
+
+struct msgTx_t {
+  uint8_t numBytes;
+  uint8_t msg[30];
+};
 
 typedef enum
 {

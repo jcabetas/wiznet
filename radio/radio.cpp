@@ -282,6 +282,8 @@ void mataRegistrador(void)
 
 void radio::arrancaRadio(void)
 {
+    initColaMsgRx();
+    initColaMsgTx();
     if (modoRadioHR->getValor()==0) // llamador
     {
         if (llamadorObj!=NULL)

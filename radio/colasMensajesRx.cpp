@@ -7,6 +7,7 @@
 #include "hal.h"
 #include "ch.h"
 #include "colas.h"
+#include "radio.h"
 #include "string.h"
 
 #define NUMMSGRXENCOLA  5

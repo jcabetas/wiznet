@@ -14,6 +14,7 @@
 #include "ch.h"
 #include "colas.h"
 #include "string.h"
+#include "radio.h"
 
 #define NUMMSGTXENCOLA  3
 

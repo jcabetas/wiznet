@@ -16,7 +16,6 @@ using namespace chibios_rt;
 #include "colas.h"
 #include "modbus.h"
 #include "registros.h"
-#include "lcd.h"
 #include "radio.h"
 
 thread_t *slaveMBThread = NULL;
@@ -73,7 +72,7 @@ void initHoldingRegistersControl(modbusSlave *modbusControl)
    sTimeOutLlamadoresHR =  modbusControl->addHoldingRegisterInt("Tiempo olvido (s)", 30, 36000, 120, true);  // timeout para que el satelite se considere desconectado
    idLlamadorHR = modbusControl->addHoldingRegisterInt("id Llamador", 1, 8, 6, true);                        // id satelite en modo llamador
 
-   sMaxEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T refresco (s)", 10, 36000, 60, true); // tiempo maximo llamadores sin enviar estado peticion
+   sMaxEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T refresco (s)", 4, 36000, 5, true); // tiempo maximo llamadores sin enviar estado peticion
    dsMinEntreMsgsLlamadorHR = modbusControl->addHoldingRegisterInt("T intermsg (ds)", 5, 100, 30, true);  // tiempo minimo llamadores entre mensajes
    bloqueaAbusonesHR = modbusControl->addHoldingRegisterInt("Bloquea abuso", 0, 1, 1, true,checkAbusones);
    minutosAbusoHR = modbusControl->addHoldingRegisterInt("Abuso minutos", 1, 1440, 720, true);

@@ -13,7 +13,6 @@ using namespace chibios_rt;
 #include "modbus.h"
 #include "string.h"
 #include "stdlib.h"
-#include "lcd.h"
 #include "registros.h"
 
 //uint16_t CRC16(const uint8_t *nData, uint16_t wLength);

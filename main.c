@@ -95,7 +95,6 @@ int main(void) {
 
   tickLed();
 
-  initColas();
   initDisplay();
   chLcdprintfFilaC(3,"Arrancado LCD");
   initSD1();

@@ -140,7 +140,7 @@ CPPSRC = $(ALLCPPSRC) \
          radio/llamador.cpp radio/pozo.cpp radio/radio.cpp radio/registrador.cpp \
          calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
          tty/gets.cpp heap.cpp  serial.cpp \
-         colas/colas.cpp colas/colasMensajesRx.cpp colas/colasMensajesTx.cpp colas/colasMensajesLcd.cpp \
+         radio/colasMensajesRx.cpp radio/colasMensajesTx.cpp  \
 		 modbuslib/crc.cpp modbuslib/holdingRegisters.cpp modbuslib/inputRegisters.cpp \
          modbus/slaveMB.cpp \
          modbuslib/modbus.cpp modbuslib/modbusMaestro.cpp modbuslib/modbusSlave.cpp \
