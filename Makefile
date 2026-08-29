@@ -87,7 +87,7 @@ endif
 #
 
 # Define project name here
-PROJECT = miniPozo
+PROJECT = wiznetMini
 
 # Target settings.
 MCU  = cortex-m4
@@ -121,21 +121,31 @@ include $(CHIBIOS)/tools/mk/autobuild.mk
 # Other files (optional).
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
-include /home/joaquin/Desarrollos/librerias/librerias.mk
+
 
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD)/STM32F411xE.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
+MQTTsrc  := Ethernet_W5500/MQTT/MQTTPacket/src
 CSRC = $(ALLCSRC) \
-       $(CHIBIOS)/os/various/evtimer.c \
+       $(CHIBIOS)/os/various/evtimer.c  Ethernet_W5500/DHCP/dhcp.c  Ethernet_W5500/DNS/dns.c \
+       Ethernet_W5500/W5500/w5500.c Ethernet_W5500/socket.c Ethernet_W5500/wizchip_conf.c \
+       Ethernet_W5500/wizchip_port.c Ethernet_W5500/MQTT_Example.c \
+       $(MQTTsrc)/MQTTConnectClient.c $(MQTTsrc)/MQTTConnectServer.c \
+       $(MQTTsrc)/MQTTDeserializePublish.c $(MQTTsrc)/MQTTFormat.c $(MQTTsrc)/MQTTPacket.c \
+       $(MQTTsrc)/MQTTSerializePublish.c $(MQTTsrc)/MQTTSubscribeClient.c $(MQTTsrc)/MQTTSubscribeServer.c \
+       $(MQTTsrc)/MQTTUnsubscribeClient.c $(MQTTsrc)/MQTTUnsubscribeServer.c \
+       Ethernet_W5500/MQTT/mqtt_interface.c Ethernet_W5500/MQTT/MQTTClient.c \
        main.c 
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CPPSRC = $(ALLCPPSRC) \
-         w25q16/w25q16.cpp variables/varsGestion.cpp variables/volcarFlash.cpp variables/variables.cpp version.cpp \
+CPPSRC = $(ALLCPPSRC) 
+
+#         w25q16/w25q16.cpp variables/varsGestion.cpp variables/volcarFlash.cpp variables/variables.cpp version.cpp \
+         adcUtils.cpp \
 		 rf95/RH_RF95.cpp rf95/rf95.cpp \
          radio/llamador.cpp radio/pozo.cpp radio/radio.cpp radio/registrador.cpp \
          calendar/calendarUTC.cpp calendar/rtcV2UTC.cpp \
@@ -179,7 +189,9 @@ UDEFS = -DCHPRINTF_USE_FLOAT=TRUE
 UADEFS =
 
 # List all user directories here
-UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg w25q16 variables tty calendar colas ssd1306 rf95 pozo modbus modbuslib dispositivos radio
+UINCDIR = $(CHIBIOS)/os/hal/lib/streams usbSource cfg \
+			Ethernet_W5500 Ethernet_W5500/DHCP Ethernet_W5500/DNS Ethernet_W5500/W5500 \
+			Ethernet_W5500/MQTT Ethernet_W5500/MQTT/MQTTPacket/src
 
 # List the user directory to look for the libraries here
 ULIBDIR =

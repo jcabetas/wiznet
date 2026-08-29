@@ -9,7 +9,6 @@
 #define MINIPOZO_H_
 
 
-
 #define LCD
 #undef SSD1306
 

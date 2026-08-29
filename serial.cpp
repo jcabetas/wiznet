@@ -356,7 +356,7 @@ static THD_FUNCTION(ThreadHM10, arg) {
         printHROpciones(bssHM10,modoRadioHR);// printOpcion(ttyOpciones, &opcMR);
         if (modoRadioHR->getValor()==0) // llamador
             chprintf(bssHM10,"Llamacion:%d\n",miLlamacionIR->getValor());
-        chprintf(bssHM10,"Bomba:%d Presion:%.1f\n",bombaOnIR->getValor(),presion);
+        chprintf(bssHM10,"Bomba:%d Presion:%.1f\n",bombaOnIR->getValor(),0.1f*presBarIR->getValor());
         chprintf(bssHM10,"1 Configurar hardware\n");
         chprintf(bssHM10,"2 Modo radio:%s\n",modoRadioHR->getDescripcion());
         if (modoRadioHR->getValor()==0) // llamador
