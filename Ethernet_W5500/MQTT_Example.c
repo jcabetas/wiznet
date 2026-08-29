@@ -15,6 +15,8 @@
 #include "MQTT/MQTTClient.h"
 #include "MQTT/mqtt_interface.h"
 #include "DNS/dns.h"
+#include "DHCP/dhcp.h"
+#include "wizchip_port.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -55,33 +57,33 @@ extern void led_Control(int state);
  *************************************************************/
 int mqtt_network_init(void)
 {
-	printf("=== MQTT START ===\r\n");
+  printf("=== MQTT START ===\r\n");
 #ifdef USE_BROKER_HOSTNAME
-    uint8_t broker_ip[4] = {0};
-    uint8_t dns_server[4] = {8, 8, 8, 8};  // Configure DNS server (Google DNS)
+  uint8_t broker_ip[4] = {0};
+  uint8_t dns_server[4] = {8, 8, 8, 8};  // Configure DNS server (Google DNS)
 
-    int8_t ret = DNS_run(dns_server, (uint8_t*)MQTT_BROKER_HOST, broker_ip);
-    if (ret != 1)
-    {
-        printf("DNS failed: %d\r\n", ret);
-        return -1;
-    }
+  int8_t ret = DNS_run(dns_server, (uint8_t*)MQTT_BROKER_HOST, broker_ip);
+  if (ret != 1)
+  {
+    printf("DNS failed: %d\r\n", ret);
+    return -1;
+  }
 
-    printf("DNS Success: %d.%d.%d.%d\r\n",
-            broker_ip[0], broker_ip[1], broker_ip[2], broker_ip[3]);
+  printf("DNS Success: %d.%d.%d.%d\r\n",
+         broker_ip[0], broker_ip[1], broker_ip[2], broker_ip[3]);
 #else
-    uint8_t broker_ip[4] = MQTT_BROKER_IP;
+  uint8_t broker_ip[4] = MQTT_BROKER_IP;
 #endif
-    // Open TCP socket for MQTT
-    socket(MQTT_SOCKET, Sn_MR_TCP, 0, 0);
+  // Open TCP socket for MQTT
+  socket(MQTT_SOCKET, Sn_MR_TCP, 0, 0);
 
-    printf("Connecting socket to broker...\r\n");
-    if (connect(MQTT_SOCKET, broker_ip, MQTT_BROKER_PORT) != SOCK_OK)
-    {
-        printf("Socket connect failed!\r\n");
-        return -2;
-    }
-    return 0;
+  printf("Connecting socket to broker...\r\n");
+  if (connect(MQTT_SOCKET, broker_ip, MQTT_BROKER_PORT) != SOCK_OK)
+  {
+    printf("Socket connect failed!\r\n");
+    return -2;
+  }
+  return 0;
 }
 
 /*************************************************************
@@ -89,35 +91,35 @@ int mqtt_network_init(void)
  *************************************************************/
 int mqtt_connect_broker(void)
 {
-    MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
+  MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
 
-    // 1. Setup network callbacks (using mqtt_interface.c)
-    NewNetwork(&net, MQTT_SOCKET);
+  // 1. Setup network callbacks (using mqtt_interface.c)
+  NewNetwork(&net, MQTT_SOCKET);
 
-    // 2. Init MQTT Client
-    MQTTClientInit(&client, &net,
-                   30000,      // Command timeout
-                   mqtt_sendbuf, MQTT_BUF_SIZE,
-                   mqtt_readbuf, MQTT_BUF_SIZE);
+  // 2. Init MQTT Client
+  MQTTClientInit(&client, &net,
+                 30000,      // Command timeout
+                 mqtt_sendbuf, MQTT_BUF_SIZE,
+                 mqtt_readbuf, MQTT_BUF_SIZE);
 
-    // 3. Configure connect packet
-    data.MQTTVersion = 3;
-    data.keepAliveInterval = MQTT_KEEPALIVE;
-    data.cleansession = 1;
-    data.clientID.cstring = MQTT_CLIENT_ID;
-    data.username.cstring = "joaquin";
-    data.password.cstring = "JeW31ZT9Rdx";
+  // 3. Configure connect packet
+  data.MQTTVersion = 3;
+  data.keepAliveInterval = MQTT_KEEPALIVE;
+  data.cleansession = 1;
+  data.clientID.cstring = MQTT_CLIENT_ID;
+  data.username.cstring = "joaquin";
+  data.password.cstring = "JeW31ZT9Rdx";
 
-    printf("MQTT: Connecting to broker...\r\n");
+  printf("MQTT: Connecting to broker...\r\n");
 
-    if (MQTTConnect(&client, &data) != SUCCESSS)
-    {
-        printf("MQTT: Connection FAILED!\r\n");
-        return -1;
-    }
+  if (MQTTConnect(&client, &data) != SUCCESSS)
+  {
+    printf("MQTT: Connection FAILED!\r\n");
+    return -1;
+  }
 
-    printf("MQTT: Connected successfully!\r\n");
-    return 0;
+  printf("MQTT: Connected successfully!\r\n");
+  return 0;
 }
 
 /*************************************************************
@@ -125,27 +127,27 @@ int mqtt_connect_broker(void)
  *************************************************************/
 void messageArrived(MessageData* md)
 {
-    char mBuffer[128];
+  char mBuffer[128];
 
-    printf("\r\n--- MQTT Message Received ---\r\n");
+  printf("\r\n--- MQTT Message Received ---\r\n");
 
-    // if the message is received from "stm32/sub"
-    if (memcmp(md->topicName->lenstring.data, "stm32/sub", md->topicName->lenstring.len) == 0)
-	{
-    	// Extract the message
-    	int len = md->message->payloadlen;
-        memcpy(mBuffer, md->message->payload, len);
-        mBuffer[len] = 0;
+  // if the message is received from "stm32/sub"
+  if (memcmp(md->topicName->lenstring.data, "stm32/sub", md->topicName->lenstring.len) == 0)
+  {
+    // Extract the message
+    int len = md->message->payloadlen;
+    memcpy(mBuffer, md->message->payload, len);
+    mBuffer[len] = 0;
 
-        // perform the operation
-//    	printf ("Payload: %s\r\n", mBuffer);
-        if (strcmp(mBuffer, "ON")==0)	led_Control(1);
-        if (strcmp(mBuffer, "OFF")==0)	led_Control(0);
-    }
+    // perform the operation
+    //    	printf ("Payload: %s\r\n", mBuffer);
+    if (strcmp(mBuffer, "ON")==0)	led_Control(1);
+    if (strcmp(mBuffer, "OFF")==0)	led_Control(0);
+  }
 
-    // Log the topicname and message
-    printf("Topic: %.*s\r\n", 	(int)md->topicName->lenstring.len,(char*)md->topicName->lenstring.data);
-    printf("Payload: %.*s\r\n\r\n", (int)md->message->payloadlen, (char*)md->message->payload);
+  // Log the topicname and message
+  printf("Topic: %.*s\r\n", 	(int)md->topicName->lenstring.len,(char*)md->topicName->lenstring.data);
+  printf("Payload: %.*s\r\n\r\n", (int)md->message->payloadlen, (char*)md->message->payload);
 }
 
 /*************************************************************
@@ -153,14 +155,14 @@ void messageArrived(MessageData* md)
  *************************************************************/
 int mqtt_subscribe(char *topic)
 {
-    if (MQTTSubscribe(&client, topic, QOS0, messageArrived) != SUCCESSS)
-    {
-        printf("MQTT: Subscription failed!\r\n");
-        return -1;
-    }
+  if (MQTTSubscribe(&client, topic, QOS0, messageArrived) != SUCCESSS)
+  {
+    printf("MQTT: Subscription failed!\r\n");
+    return -1;
+  }
 
-    printf("MQTT: Subscribed to [%s]\r\n", topic);
-    return 0;
+  printf("MQTT: Subscribed to [%s]\r\n", topic);
+  return 0;
 }
 
 /*************************************************************
@@ -168,21 +170,21 @@ int mqtt_subscribe(char *topic)
  *************************************************************/
 int mqtt_publish(char *topic, const char* payload)
 {
-    MQTTMessage msg;
+  MQTTMessage msg;
 
-    msg.qos = QOS0;
-    msg.retained = 0;
-    msg.dup = 0;
-    msg.payload = (void*)payload;
-    msg.payloadlen = strlen(payload);
+  msg.qos = QOS0;
+  msg.retained = 0;
+  msg.dup = 0;
+  msg.payload = (void*)payload;
+  msg.payloadlen = strlen(payload);
 
-    if (MQTTPublish(&client, topic, &msg) == SUCCESSS)
-    {
-        tickLed(1);
-        return 0; //printf("MQTT: Published → %s\r\n", payload);
-    }
-    else
-        return 1; //printf("MQTT: Publish FAILED\r\n");
+  if (MQTTPublish(&client, topic, &msg) == SUCCESSS)
+  {
+    tickLed(1);
+    return 0; //printf("MQTT: Published → %s\r\n", payload);
+  }
+  else
+    return 1; //printf("MQTT: Publish FAILED\r\n");
 }
 
 /*************************************************************
@@ -190,77 +192,90 @@ int mqtt_publish(char *topic, const char* payload)
  *************************************************************/
 int mqtt_yield(void)
 {
-	/* Handle incoming packets */
-	return MQTTYield(&client, 0);
+  /* Handle incoming packets */
+  return MQTTYield(&client, 0);
 }
 
-///*************************************************************
-// *  MAIN APPLICATION ENTRY
-// *************************************************************/
-//void MQTT_Example(void)
-//{
-//    printf("=== MQTT EXAMPLE START ===\r\n");
-//
-//    mqtt_network_init();
-//
-//    if (mqtt_connect_broker() != 0)
-//    {
-//    	// error handler
-//    }
-//
-//    mqtt_subscribe("topic");
-//
-//    uint32_t tick5s = HAL_GetTick();
-//
-//    while (1)
-//    {
-//    	mqtt_yield();
-//        /* Publish every 5 seconds */
-//        if (HAL_GetTick() - tick5s >= 5000)
-//        {
-//            tick5s = HAL_GetTick();
-//            mqtt_publish("topic", "message");
-//        }
-//    }
-//}
+
+
+//#define DHCP_SOCKET   7  // last available socket COMPROBAR MEJOR
+
+extern uint8_t DNS_buffer[512];
 
 static THD_WORKING_AREA(waYield, 1024);
 static THD_FUNCTION(threadYield, arg) {
-    (void) arg;
-    uint16_t ms = 0;
-    uint16_t count = 0;
-    char buffer[30];
-    chRegSetThreadName("Yield");
-    int error = W5500_Init();
-    mqtt_network_init();
-    mqtt_connect_broker();
-    if (mqtt_subscribe("stm32/sub") != 0)
-      tickLed(100);
+  (void) arg;
+  uint16_t ms = 0;
+  uint16_t count = 0;
+  char buffer[30];
+  static volatile bool ip_assigned = false;
+  chRegSetThreadName("Yield");
+  W5500_Init();
+  mqtt_network_init();
+  mqtt_connect_broker();
+  if (mqtt_subscribe("stm32/sub") != 0)
+    tickLed(100);
 
-    while (1)
-    {
-        uint8_t cfgr = getPHYCFGR();
-        if (!(cfgr & 1))
-        {
-          uint8_t pp=0; // no está conectado
-        }
-        int error = mqtt_yield();
-        if (ms>=5000)
-        {
-            snprintf (buffer, sizeof(buffer), "STM32 W5500 -> %d", count++);
-            mqtt_publish("stm32/pub", buffer);
-            ms = 0;
-        }
-            chThdSleepMilliseconds(50);
-            ms += 50;
+  while (1)
+  {
+    uint8_t phy_reg = getPHYCFGR();
+    if (!(phy_reg & 0x01)) {
+      // Cable is physically missing or disconnected
+      if (ip_assigned) {
+        ip_assigned = false;
+        DHCP_stop();
+      }
+      chThdSleepMilliseconds(100);
+      continue;
     }
+
+    // Physical cable is confirmed present, run the driver's DHCP state process
+    uint8_t dhcp_status = DHCP_run();
+    if (dhcp_status == DHCP_FAILED) {
+      ip_assigned = false;
+      chThdSleepMilliseconds(100);
+      DHCP_init(DHCP_SOCKET_NUM, DNS_buffer);
+    }
+
+    // 1. Ask the WIZnet hardware if the physical TCP connection is still alive
+    uint8_t s_status = getSn_SR(MQTT_SOCKET);
+    if (s_status == SOCK_CLOSED || s_status == SOCK_CLOSE_WAIT) {
+      // Force reset the MQTT library flag if the hardware socket died
+      client.isconnected = 0;
+      close(MQTT_SOCKET); // Clear the socket registers cleanly
+    }
+
+    // 2. Check the library flag. If it dropped, handle full initialization.
+    if (client.isconnected == 0) {
+      printf("MQTT Connection lost! Re-initializing hardware and protocol...\n");
+      // Fully tear down old context
+      disconnect(MQTT_SOCKET);
+      // Re-open your TCP Network layer and issue an MQTT Connect
+      mqtt_network_init();
+      mqtt_connect_broker();
+    }
+    else {
+      // 3. Keep-alive handling if everything is healthy
+      MQTTYield(&client, 150);
+    }
+
+    mqtt_yield();
+    if (ms>=5000)
+    {
+      snprintf (buffer, sizeof(buffer), "STM32 W5500 -> %d", count++);
+      mqtt_publish("stm32/pub", buffer);
+      ms = 0;
+    }
+    chThdSleepMilliseconds(50);
+    ms += 50;
+  }
 }
 
 void mqtt_initThread(void)
 {
-    if (!procesoYield)
-    {
-        procesoYield = chThdCreateStatic(waYield, sizeof(waYield), NORMALPRIO, threadYield, NULL);
-    }
+  if (!procesoYield)
+  {
+    procesoYield = chThdCreateStatic(waYield, sizeof(waYield), NORMALPRIO, threadYield, NULL);
+  }
 }
 

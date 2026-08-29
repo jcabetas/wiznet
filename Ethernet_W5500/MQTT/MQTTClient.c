@@ -270,7 +270,7 @@ int cycle(MQTTClient* c, Timer* timer) {
         c->ping_outstanding = 0;
         break;
     }
-    keepalive(c);
+    int exitoKeepAlive = keepalive(c);
 exit:
     if (rc == SUCCESSS) {
         rc = packet_type;
@@ -379,6 +379,8 @@ exit:
     if (rc == SUCCESSS) {
         c->isconnected = 1;
     }
+    else
+      c->isconnected = 0;
 
 #if defined(MQTT_TASK)
     MutexUnlock(&c->mutex);
